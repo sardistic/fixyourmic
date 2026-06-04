@@ -10,11 +10,52 @@ const statusText = document.getElementById('status-text');
 const MAX_HISTORY = 600;
 const history = [];
 
-// Target loudness — driven by the content-type dropdown
+// Target loudness — driven by content-type chips (synced to hidden select)
 let TARGET_LUFS = -18;
+
 document.getElementById('target-preset').addEventListener('change', e => {
   TARGET_LUFS = parseInt(e.target.value, 10);
 });
+
+// Content-type chip interaction
+document.querySelectorAll('.ct-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.ct-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    TARGET_LUFS = parseInt(chip.dataset.val, 10);
+    // Keep hidden select in sync for report snapshot
+    document.getElementById('target-preset').value = chip.dataset.val;
+  });
+});
+
+// Suggestion chips — populate the input and focus
+document.querySelectorAll('.sug-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const input = document.getElementById('stream-url-input');
+    input.value = chip.dataset.channel;
+    input.focus();
+  });
+});
+
+// Robust Twitch channel name extractor — handles any URL format the user might paste
+function parseChannelInput(raw) {
+  if (!raw) return '';
+  let s = raw.trim();
+  // URI-decode if needed (e.g. https%3A%2F%2F...)
+  try { s = decodeURIComponent(s); } catch {}
+  // Strip protocol
+  s = s.replace(/^https?:\/\//i, '');
+  // Strip mobile/www subdomain
+  s = s.replace(/^(?:www\.|m\.|clips\.)?/i, '');
+  // Extract channel from twitch.tv/channelname[/anything][?params]
+  const twitchMatch = s.match(/^twitch\.tv\/([a-zA-Z0-9_]{1,25})/i);
+  if (twitchMatch) return twitchMatch[1].toLowerCase();
+  // Already just a username (possibly with trailing path/params)
+  const nameMatch = s.match(/^([a-zA-Z0-9_]{1,25})(?:[/?#]|$)/);
+  if (nameMatch) return nameMatch[1].toLowerCase();
+  // Last resort: strip invalid characters
+  return s.replace(/[^a-z0-9_]/gi, '').toLowerCase().slice(0, 25);
+}
 
 let hls = null;
 let audioCtx = null;
@@ -39,14 +80,13 @@ document.querySelectorAll('.tab').forEach(tab => {
 
 // ── Stream URL (via streamlink server-side) ──────────────────────────────────
 document.getElementById('analyze-stream').addEventListener('click', () => {
-  let raw = document.getElementById('stream-url-input').value.trim();
-  if (!raw) return;
-  // Accept bare channel name, twitch.tv/name, or full URL
-  if (!/^https?:\/\//i.test(raw)) {
-    raw = raw.replace(/^(www\.)?twitch\.tv\//i, '');
-    raw = `https://www.twitch.tv/${raw.split('/')[0].split('?')[0]}`;
-  }
-  resolveAndLoad(raw);
+  const raw = document.getElementById('stream-url-input').value;
+  const channel = parseChannelInput(raw);
+  if (!channel) return;
+  resolveAndLoad(`https://www.twitch.tv/${channel}`);
+});
+document.getElementById('stream-url-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('analyze-stream').click();
 });
 document.getElementById('stream-url-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('analyze-stream').click();
@@ -147,9 +187,13 @@ let listenerGain = null;
 
 function _startAnalyzerFromNode(sourceNode) {
   // Listener output chain: source → listenerGain → destination
-  // This is separate from the analysis chain so volume changes don't affect metrics.
+  // Start muted — user unmutes via the slider. Analysis is unaffected.
   listenerGain = audioCtx.createGain();
-  listenerGain.gain.value = document.getElementById('volume-slider').value / 100;
+  listenerGain.gain.value = 0;
+  document.getElementById('volume-slider').value = 0;
+  document.getElementById('volume-display').textContent = 'Muted';
+  document.getElementById('mute-icon-on').style.display = 'none';
+  document.getElementById('mute-icon-off').style.display = '';
   sourceNode.connect(listenerGain);
   listenerGain.connect(audioCtx.destination);
 
@@ -507,7 +551,11 @@ function stopAnalysis() {
   dashboard.classList.add('hidden');
   statusBar.classList.add('hidden');
 
-  if (reportSnapshot) showReport(reportSnapshot);
+  if (reportSnapshot) {
+    showReport(reportSnapshot);
+  } else {
+    document.getElementById('landing')?.classList.remove('hidden');
+  }
 }
 
 // ── Volume / mute controls ────────────────────────────────────────────────────
@@ -517,16 +565,15 @@ const volumeDisplay = document.getElementById('volume-display');
 volumeSlider.addEventListener('input', () => {
   const val = volumeSlider.value / 100;
   if (listenerGain) listenerGain.gain.value = val;
-  volumeDisplay.textContent = `${volumeSlider.value}%`;
-  // Sync mute icon state
+  volumeDisplay.textContent = val === 0 ? 'Muted' : `${volumeSlider.value}%`;
   const muted = val === 0;
   document.getElementById('mute-icon-on').style.display = muted ? 'none' : '';
   document.getElementById('mute-icon-off').style.display = muted ? '' : 'none';
 });
 
-let _preMuteVolume = volumeSlider.value;
+let _preMuteVolume = 80;
 document.getElementById('mute-btn').addEventListener('click', () => {
-  if (volumeSlider.value > 0) {
+  if (parseInt(volumeSlider.value) > 0) {
     _preMuteVolume = volumeSlider.value;
     volumeSlider.value = 0;
   } else {
@@ -538,6 +585,7 @@ document.getElementById('mute-btn').addEventListener('click', () => {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function setStatus(state, text) {
   statusBar.classList.remove('hidden');
+  document.getElementById('landing')?.classList.add('hidden');
   statusDot.className = `status-dot ${state}`;
   statusText.textContent = text;
 }
@@ -845,7 +893,7 @@ function showReport(snap) {
   const el = document.getElementById('report');
   el.innerHTML = `
     <div class="rep-toolbar no-print">
-      <button class="btn-primary" onclick="document.getElementById('report').classList.add('hidden'); document.querySelector('.input-section').classList.remove('hidden');">
+      <button class="btn-primary" onclick="document.getElementById('report').classList.add('hidden'); document.getElementById('landing').classList.remove('hidden');">
         ← New Analysis
       </button>
       <button class="btn-export" onclick="window.print()">
