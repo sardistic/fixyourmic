@@ -426,13 +426,14 @@ function buildRecs(m) {
     }
   }
 
-  // Noise floor
-  if (isFinite(m.noiseFloor) && m.noiseFloorSamples?.length > 10) {
+  // Noise floor (only flag if we have enough confident samples)
+  if (isFinite(m.noiseFloor) && m.noiseFloorSamples?.length >= 30) {
     if (m.noiseFloor > -45) {
-      recs.push({ type: 'bad', title: 'High noise floor', body: `Background noise at ${fmt(m.noiseFloor, 1)} dBFS is audible. Viewers will hear hiss or hum during quiet moments. Consider a noise gate.` });
-    } else if (m.noiseFloor > -55) {
-      recs.push({ type: 'warn', title: 'Moderate noise floor', body: `Noise floor at ${fmt(m.noiseFloor, 1)} dBFS. Barely noticeable to most viewers but a noise gate would help.` });
+      recs.push({ type: 'bad', title: 'Audible noise floor', body: `Noise floor at ${fmt(m.noiseFloor, 1)} dBFS is clearly audible. Viewers hear persistent hiss or hum. A noise gate or noise suppressor is needed.` });
+    } else if (m.noiseFloor > -50) {
+      recs.push({ type: 'warn', title: 'Elevated noise floor', body: `Noise floor at ${fmt(m.noiseFloor, 1)} dBFS may be noticeable in quiet passages. A noise gate set around −45 dBFS threshold would help.` });
     }
+    // -50 to -60: acceptable, no mention. Below -60: clean.
   }
 
   // Crest factor (compression indicator)
@@ -591,10 +592,11 @@ function updateBroadcastScore(m) {
     else                 { issues.push({ cls: 'good', text: `${fmt(m.lra, 1)} LU dynamic range — natural sounding` }); }
   }
 
-  // Noise floor
-  if (isFinite(m.noiseFloor)) {
+  // Noise floor — only score when we have enough sustained quiet samples
+  if (isFinite(m.noiseFloor) && m.noiseFloorSamples?.length >= 30) {
     if (m.noiseFloor > -45)      { score -= 15; issues.push({ cls: 'bad',  text: `Noise floor ${fmt(m.noiseFloor, 1)} dBFS — audible hiss` }); }
-    else if (m.noiseFloor > -55) { score -= 5;  issues.push({ cls: 'warn', text: `Noise floor ${fmt(m.noiseFloor, 1)} dBFS — marginal` }); }
+    else if (m.noiseFloor > -50) { score -= 5;  issues.push({ cls: 'warn', text: `Noise floor ${fmt(m.noiseFloor, 1)} dBFS — may be noticeable` }); }
+    // -50 to -60: clean enough for streaming, no penalty
   }
 
   score = Math.max(0, Math.round(score));
@@ -692,13 +694,13 @@ function updateCorrections(m) {
     });
   }
 
-  // Noise floor
-  if (isFinite(m.noiseFloor) && m.noiseFloor > -50) {
+  // Noise floor — only flag when we have 30+ sustained quiet samples (-55 dBFS threshold)
+  if (isFinite(m.noiseFloor) && m.noiseFloorSamples?.length >= 30 && m.noiseFloor > -50) {
     corrs.push({
-      priority: m.noiseFloor > -42 ? 'bad' : 'warn',
+      priority: m.noiseFloor > -45 ? 'bad' : 'warn',
       icon: '~',
-      action: 'Enable a noise gate (close threshold: −40 dBFS, open: −35 dBFS)',
-      why: `Background noise at ${fmt(m.noiseFloor, 1)} dBFS is audible during pauses. Viewers hear room hiss, AC units, or keyboard noise between sentences.`,
+      action: 'Enable a noise gate (close threshold: −45 dBFS, open: −40 dBFS)',
+      why: `Estimated noise floor at ${fmt(m.noiseFloor, 1)} dBFS${m.noiseFloor > -45 ? ' is clearly audible' : ' may be noticeable'} during pauses. Viewers hear room hiss, AC units, or keyboard noise between sentences.`,
       how: 'OBS: Filters → Noise Gate. Close: −40 dB, Open: −35 dB, Attack: 25 ms, Hold: 200 ms, Release: 150 ms.',
     });
   }

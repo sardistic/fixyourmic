@@ -189,12 +189,18 @@ class StreamAnalyzer {
     const peakL = Math.max(...tdL.map(Math.abs));
     const peakR = Math.max(...tdR.map(Math.abs));
 
-    // Noise floor: track quiet moments
-    if (rmsDB < -40) {
+    // Noise floor: only sample during genuinely quiet moments (< -55 dBFS).
+    // Using -40 was too loose — it caught brief pauses in music/game audio.
+    // Track the 10th percentile (near-minimum) of quiet samples, not the average,
+    // because noise floor is defined as the floor, not the mean of quiet periods.
+    // Require 30+ samples (~0.5s at 60fps) before trusting the estimate.
+    if (rmsDB < -55) {
       this.noiseFloorSamples.push(rmsDB);
-      if (this.noiseFloorSamples.length > 50) this.noiseFloorSamples.shift();
-      if (this.noiseFloorSamples.length > 5) {
-        this.noiseFloor = this.noiseFloorSamples.reduce((a, b) => a + b, 0) / this.noiseFloorSamples.length;
+      if (this.noiseFloorSamples.length > 300) this.noiseFloorSamples.shift();
+      if (this.noiseFloorSamples.length >= 30) {
+        const sorted = [...this.noiseFloorSamples].sort((a, b) => a - b);
+        // 10th percentile — representative floor, not skewed by the quietest outlier
+        this.noiseFloor = sorted[Math.floor(sorted.length * 0.1)];
       }
     }
 
@@ -225,6 +231,7 @@ class StreamAnalyzer {
       lra,
       headroom,
       noiseFloor: this.noiseFloor,
+      noiseFloorSamples: this.noiseFloorSamples,
       clipCount: this.clipCount,
       bands,
       hasEnoughData: this.lufsBlocks.length >= 5,
