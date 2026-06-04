@@ -12,10 +12,12 @@ app.use(express.static(path.join(__dirname, 'public')));
 // system PATH seen by Node.js differs from the shell PATH (common on Windows).
 let STREAMLINK_BIN = 'streamlink';
 try {
-  const found = execSync('where streamlink', { encoding: 'utf8' }).trim().split('\n')[0].trim();
+  // 'where' is Windows-only; Linux/Docker uses 'which'
+  const whichCmd = process.platform === 'win32' ? 'where streamlink' : 'which streamlink';
+  const found = execSync(whichCmd, { encoding: 'utf8' }).trim().split('\n')[0].trim();
   if (found) STREAMLINK_BIN = found;
 } catch {
-  // 'where' failed; keep default and let execFile surface the error naturally
+  // keep default
 }
 console.log(`streamlink: ${STREAMLINK_BIN}`);
 
@@ -53,8 +55,11 @@ app.get('/api/stream', (req, res) => {
         return res.status(502).json({ error: `streamlink: ${msg.slice(0, 200) || 'unknown error'}` });
       }
 
+      // Route all HLS through our proxy so every Twitch CDN request comes from
+      // the same server IP that streamlink used to generate the access token.
+      // Loading the URL directly in the browser fails with 403 (IP mismatch).
       const hlsUrl = output.split('\n')[0];
-      res.json({ url: hlsUrl });
+      res.json({ url: `/proxy?url=${encodeURIComponent(hlsUrl)}` });
     }
   );
 });

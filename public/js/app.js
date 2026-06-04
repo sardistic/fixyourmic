@@ -70,7 +70,6 @@ async function resolveAndLoad(streamUrl) {
       setStatus('error', data.error);
       return;
     }
-    // CDN URL from streamlink has CORS * — browser can load directly, no proxy needed
     loadHls(data.url, streamUrl);
   } catch (err) {
     setStatus('error', `Network error: ${err.message}`);
