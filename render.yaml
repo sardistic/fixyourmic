@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: stream-audio-analyzer
+    runtime: docker
+    plan: free
+    healthCheckPath: /
