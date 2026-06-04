@@ -10,6 +10,12 @@ const statusText = document.getElementById('status-text');
 const MAX_HISTORY = 600;
 const history = [];
 
+// Target loudness — driven by the content-type dropdown
+let TARGET_LUFS = -18;
+document.getElementById('target-preset').addEventListener('change', e => {
+  TARGET_LUFS = parseInt(e.target.value, 10);
+});
+
 let hls = null;
 let audioCtx = null;
 let analyzer = null;
@@ -221,24 +227,34 @@ function updateMetricsUI(m) {
   // Viewer impact line
   const vi = document.getElementById('viewer-impact');
   if (vi && isFinite(m.lufsIntegrated)) {
-    const diff = m.lufsIntegrated - (-14);
+    const diff = m.lufsIntegrated - TARGET_LUFS;
     let msg, cls;
-    if (diff > 5)       { msg = `${fmt(diff,1)} dB too loud — viewers will turn you down`; cls = 'bad'; }
-    else if (diff > 1)  { msg = `${fmt(diff,1)} dB above Twitch target — slightly loud`; cls = 'warn'; }
-    else if (diff >= -2){ msg = 'Perfect listening level for viewers'; cls = 'good'; }
-    else if (diff >= -6){ msg = `${fmt(-diff,1)} dB below target — viewers may turn up volume`; cls = 'warn'; }
-    else                { msg = `${fmt(-diff,1)} dB too quiet — viewers need to boost volume`; cls = 'bad'; }
+    if (diff > 5)       { msg = `${fmt(diff,1)} dB too loud for this content type`; cls = 'bad'; }
+    else if (diff > 1)  { msg = `${fmt(diff,1)} dB above target — slightly loud`; cls = 'warn'; }
+    else if (diff >= -2){ msg = `On target for ${document.getElementById('target-preset').selectedOptions[0]?.text.split('(')[0].trim() || 'selected content type'}`; cls = 'good'; }
+    else if (diff >= -6){ msg = `${fmt(-diff,1)} dB below target — slightly quiet`; cls = 'warn'; }
+    else                { msg = `${fmt(-diff,1)} dB below target — too quiet`; cls = 'bad'; }
     vi.textContent = msg;
     vi.className = `viewer-impact vi-${cls}`;
   }
 
-  // LUFS needle: map -40 to 0 → 0% to 100%
-  const lufsPercent = isFinite(m.lufsIntegrated)
-    ? Math.max(0, Math.min(100, ((m.lufsIntegrated + 40) / 40) * 100))
-    : 0;
+  // LUFS gauge: map -40 to 0 dB → 0% to 100%
+  const lufsToPercent = db => Math.max(0, Math.min(100, ((db + 40) / 40) * 100));
+  const lufsPercent = isFinite(m.lufsIntegrated) ? lufsToPercent(m.lufsIntegrated) : 0;
   document.getElementById('lufs-fill').style.width = `${lufsPercent}%`;
   const needle = document.getElementById('lufs-needle');
   if (needle) needle.style.left = `${lufsPercent}%`;
+
+  // Shift LUFS zone widths to track TARGET_LUFS
+  const tooQuietEnd = lufsToPercent(TARGET_LUFS - 8);
+  const lowEnd      = lufsToPercent(TARGET_LUFS - 3);
+  const goodEnd     = lufsToPercent(TARGET_LUFS + 3);
+  const highEnd     = lufsToPercent(TARGET_LUFS + 7);
+  const zoneEls     = document.querySelectorAll('.lufs-zone');
+  if (zoneEls.length === 5) {
+    [tooQuietEnd, lowEnd - tooQuietEnd, goodEnd - lowEnd, highEnd - goodEnd, 100 - highEnd]
+      .forEach((w, i) => zoneEls[i].style.flex = `0 0 ${Math.max(0, w)}%`);
+  }
 
   // Peak
   const peakStr = isFinite(m.peakHoldDB) ? `${fmt(m.peakHoldDB, 1)}` : '—';
@@ -364,8 +380,8 @@ function buildRecs(m) {
     const lufs = m.lufsIntegrated;
     if (lufs > -9) {
       recs.push({ type: 'bad', title: 'Audio is too loud', body: `At ${fmt(lufs, 1)} LUFS, platforms will aggressively reduce your stream. Target around −14 LUFS.` });
-    } else if (lufs > -14) {
-      recs.push({ type: 'warn', title: 'Slightly above target', body: `${fmt(lufs, 1)} LUFS will trigger normalization on YouTube and be near Twitch's compression threshold. Reduce output by ~${fmt(lufs + 14, 1)} LU.` });
+    } else if (lufs > TARGET_LUFS) {
+      recs.push({ type: 'warn', title: 'Slightly above target', body: `${fmt(lufs, 1)} LUFS is ${fmt(lufs - TARGET_LUFS, 1)} LU above your content-type target. Reduce output by ~${fmt(lufs - TARGET_LUFS, 1)} LU.` });
     } else if (lufs >= -18) {
       recs.push({ type: 'good', title: 'Loudness on target', body: `${fmt(lufs, 1)} LUFS sits well within the −14 LUFS streaming sweet spot.` });
     } else if (lufs >= -23) {
@@ -473,6 +489,8 @@ function stopAnalysis() {
       label: currentStreamLabel,
       date: new Date().toLocaleString(),
       startTime: analysisStartTime,
+      targetLufs: TARGET_LUFS,
+      contentType: document.getElementById('target-preset').selectedOptions[0]?.text.split('(')[0].trim() || 'Streaming',
     };
   }
 
@@ -541,10 +559,11 @@ function colorBigValue(id, color) {
 
 function lufsColor(lufs) {
   if (!isFinite(lufs)) return 'var(--text)';
-  if (lufs > -9)  return 'var(--red)';
-  if (lufs > -14) return 'var(--orange)';
-  if (lufs > -18) return 'var(--green)';
-  if (lufs > -23) return 'var(--yellow)';
+  const diff = lufs - TARGET_LUFS;
+  if (diff > 5)        return 'var(--red)';
+  if (diff > 2)        return 'var(--orange)';
+  if (diff >= -3)      return 'var(--green)';
+  if (diff >= -8)      return 'var(--yellow)';
   return 'var(--text-muted)';
 }
 
@@ -563,16 +582,16 @@ function updateBroadcastScore(m) {
   let score = 100;
   const issues = [];
 
-  // Loudness vs -14 LUFS target
-  const lufsDiff = m.lufsIntegrated - (-14);
+  // Loudness vs content-type target
+  const lufsDiff = m.lufsIntegrated - TARGET_LUFS;
   if (Math.abs(lufsDiff) > 1) {
     const penalty = Math.min(35, Math.abs(lufsDiff - (lufsDiff > 0 ? 1 : -1)) * 4);
     score -= penalty;
   }
-  if (lufsDiff > 3)       issues.push({ cls: 'bad',  text: `${fmt(lufsDiff, 1)} LU above target — loud for viewers` });
-  else if (lufsDiff > 1)  issues.push({ cls: 'warn', text: `${fmt(lufsDiff, 1)} LU above Twitch target` });
-  else if (lufsDiff < -6) issues.push({ cls: 'warn', text: `${fmt(-lufsDiff, 1)} LU below target — quiet for viewers` });
-  else                    issues.push({ cls: 'good', text: 'Loudness within broadcast target range' });
+  if (lufsDiff > 3)       issues.push({ cls: 'bad',  text: `${fmt(lufsDiff, 1)} LU above ${TARGET_LUFS} LUFS target` });
+  else if (lufsDiff > 1)  issues.push({ cls: 'warn', text: `${fmt(lufsDiff, 1)} LU above content-type target` });
+  else if (lufsDiff < -6) issues.push({ cls: 'warn', text: `${fmt(-lufsDiff, 1)} LU below target — quiet` });
+  else                    issues.push({ cls: 'good', text: `Loudness on target (${TARGET_LUFS} LUFS)` });
 
   // Clipping
   if (m.clipCount > 0) {
@@ -623,7 +642,6 @@ function updateBroadcastScore(m) {
 // ── Broadcast corrections ─────────────────────────────────────────────────────
 function updateCorrections(m) {
   if (!isFinite(m.lufsIntegrated)) return;
-  const TARGET_LUFS = -14;
   const corrs = [];
 
   // Loudness correction — the most important one
@@ -648,8 +666,8 @@ function updateCorrections(m) {
     corrs.push({
       priority: 'good',
       icon: '✓',
-      action: 'Loudness is on target',
-      why: `At ${fmt(m.lufsIntegrated, 1)} LUFS, viewers hear you at the right level — consistent with other well-produced streams.`,
+      action: `Loudness is on target (${TARGET_LUFS} LUFS)`,
+      why: `At ${fmt(m.lufsIntegrated, 1)} LUFS, you're within ${fmt(Math.abs(lufsDiff), 1)} LU of the ${TARGET_LUFS} LUFS target — consistent with well-produced streaming content.`,
       how: null,
     });
   }
@@ -756,7 +774,8 @@ function fmtTime(seconds) {
 
 // ── Report generation ─────────────────────────────────────────────────────────
 function showReport(snap) {
-  const { histImg, history: hist, metrics: m, recs, label, date } = snap;
+  const { histImg, history: hist, metrics: m, recs, label, date, targetLufs = -18, contentType = 'Streaming' } = snap;
+  const snapTarget = targetLufs;
   const duration = hist.length > 1 ? (hist[hist.length - 1].t - hist[0].t) / 1000 : 0;
 
   // Overall stats from full history
@@ -784,10 +803,11 @@ function showReport(snap) {
     const offset = (bucket[0].t - hist[0].t) / 1000;
     let flag = '';
     let flagClass = '';
-    if (mp >= -1)   { flag = 'Clipping risk'; flagClass = 'seg-bad'; }
-    else if (al > -9)  { flag = 'Very loud';    flagClass = 'seg-bad'; }
-    else if (al > -14) { flag = 'Loud';         flagClass = 'seg-warn'; }
-    else if (al < -25) { flag = 'Quiet';        flagClass = 'seg-info'; }
+    if (mp >= -1)                  { flag = 'Clipping risk';  flagClass = 'seg-bad'; }
+    else if (al > snapTarget + 5)  { flag = 'Very loud';      flagClass = 'seg-bad'; }
+    else if (al > snapTarget + 2)  { flag = 'Loud';           flagClass = 'seg-warn'; }
+    else if (al < snapTarget - 10) { flag = 'Very quiet';     flagClass = 'seg-info'; }
+    else if (al < snapTarget - 5)  { flag = 'Quiet';          flagClass = 'seg-info'; }
     segments.push({ time: fmtTime(offset), avgLufs: al, maxPeak: mp, avgRms: ar, flag, flagClass });
   }
 
@@ -842,11 +862,12 @@ function showReport(snap) {
             <span>${label}</span>
             <span>${date}</span>
             <span>Duration: ${fmtTime(duration)}</span>
+            <span>Target: ${snapTarget} LUFS (${contentType})</span>
           </div>
         </div>
         ${avgLufs !== null ? (() => {
           let sc = 100;
-          const ld = Math.abs(avgLufs - (-14));
+          const ld = Math.abs(avgLufs - snapTarget);
           if (ld > 1) sc -= Math.min(35, (ld - 1) * 4);
           if (m && m.clipCount > 0) sc -= Math.min(25, m.clipCount * 5);
           if (m && m.lra < 3) sc -= 10; else if (m && m.lra > 18) sc -= 8;
@@ -862,7 +883,7 @@ function showReport(snap) {
       <div class="rep-section-title">Key Metrics</div>
       <div class="rep-stats">
         <div class="rep-stat">
-          <div class="rep-stat-val ${avgLufs !== null && avgLufs > -14 ? 'warn' : avgLufs !== null && avgLufs > -18 ? 'good' : ''}">${avgLufs !== null ? fmt(avgLufs, 1) : '—'}</div>
+          <div class="rep-stat-val ${avgLufs !== null && Math.abs(avgLufs - snapTarget) <= 3 ? 'good' : avgLufs !== null && Math.abs(avgLufs - snapTarget) <= 6 ? 'warn' : ''}">${avgLufs !== null ? fmt(avgLufs, 1) : '—'}</div>
           <div class="rep-stat-label">Avg LUFS</div>
         </div>
         <div class="rep-stat">

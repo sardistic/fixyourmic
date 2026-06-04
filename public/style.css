@@ -135,6 +135,21 @@ input[type="text"].full-width:focus { border-color: var(--accent); }
 }
 .btn-capture { display: flex; align-items: center; gap: 8px; padding: 12px 24px; font-size: 0.95rem; }
 
+.target-select-wrap { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+.target-label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.target-select {
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.target-select:focus { border-color: var(--accent); }
+
 .btn-primary {
   padding: 10px 22px;
   background: var(--accent);

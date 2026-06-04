@@ -34,6 +34,16 @@
             <span class="prefix">twitch.tv /</span>
             <input type="text" id="stream-url-input" placeholder="channelname" autocomplete="off" spellcheck="false">
           </div>
+          <div class="target-select-wrap">
+            <label class="target-label">Content type</label>
+            <select id="target-preset" class="target-select">
+              <option value="-16">Talk / Just Chatting  (−16 LUFS)</option>
+              <option value="-18" selected>Gaming + Commentary  (−18 LUFS)</option>
+              <option value="-20">Game Audio Focus  (−20 LUFS)</option>
+              <option value="-24">Cinematic / Immersive  (−24 LUFS)</option>
+              <option value="-14">Music Heavy  (−14 LUFS)</option>
+            </select>
+          </div>
           <button class="btn-primary" id="analyze-stream">Analyze</button>
         </div>
         <p class="hint">Enter a channel name or paste the full Twitch URL. Uses streamlink to pull the audio stream directly.</p>
