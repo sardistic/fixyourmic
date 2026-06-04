@@ -158,6 +158,16 @@ main { max-width: 1200px; margin: 0 auto; padding: 0 20px 60px; }
   transition: all 0.15s;
 }
 .sug-chip:hover { border-color: var(--accent2); color: var(--accent2); background: rgba(124,58,237,0.1); }
+.sug-chip { display: inline-flex; align-items: center; gap: 6px; }
+.sug-viewers {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 0.68rem; color: var(--red); font-weight: 600;
+}
+.sug-viewers::before {
+  content: ''; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--red); display: inline-block;
+}
+.sug-loading { font-size: 0.75rem; color: var(--text-muted); opacity: 0.6; }
 .sug-note { font-size: 0.72rem; color: var(--text-muted); opacity: 0.6; }
 
 .advanced-toggle {

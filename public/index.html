@@ -5,8 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fix Your Mic — Broadcast Audio Analysis for Streamers</title>
   <meta name="description" content="Paste any live Twitch channel and get broadcast-grade audio analysis — LUFS, peaks, dynamic range, frequency balance, and exact corrections.">
-  <meta name="theme-color" content="#7c3aed">
+  <meta name="theme-color" content="#13131c">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+  <link rel="shortcut icon" href="favicon.ico">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="manifest" href="site.webmanifest">
+  <!-- Open Graph / social -->
+  <meta property="og:title" content="Fix Your Mic — Broadcast Audio Analysis for Streamers">
+  <meta property="og:description" content="Paste any live Twitch channel and get broadcast-grade audio analysis — LUFS, peaks, dynamic range, and exact corrections.">
+  <meta property="og:image" content="og-image.png">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
@@ -16,14 +27,22 @@
   <header class="site-header">
     <div class="site-header-inner">
       <div class="logo">
-        <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect width="32" height="32" rx="7" fill="#7c3aed"/>
-          <rect x="11" y="3" width="10" height="15" rx="5" fill="white"/>
-          <path d="M6 16a10 10 0 0 0 20 0" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
-          <line x1="16" y1="26" x2="16" y2="29.5" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
-          <line x1="11" y1="29.5" x2="21" y2="29.5" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
-          <line x1="11" y1="10" x2="21" y2="10" stroke="#7c3aed" stroke-width="1" opacity="0.4"/>
-          <line x1="11" y1="13" x2="21" y2="13" stroke="#7c3aed" stroke-width="1" opacity="0.4"/>
+        <svg width="30" height="30" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="32" height="32" rx="7.5" fill="#13131c"/>
+          <defs><clipPath id="lc"><rect x="12" y="5.5" width="8" height="14.5" rx="4"/></clipPath></defs>
+          <g clip-path="url(#lc)">
+            <rect x="12" y="5.5"  width="8" height="8"   fill="#22c55e"/>
+            <rect x="12" y="13.5" width="8" height="3.6" fill="#f59e0b"/>
+            <rect x="12" y="17.1" width="8" height="2.9" fill="#ef4444"/>
+          </g>
+          <g stroke="#13131c" stroke-width="0.5">
+            <line x1="12.3" y1="9"    x2="19.7" y2="9"/>
+            <line x1="12.3" y1="11.5" x2="19.7" y2="11.5"/>
+            <line x1="12.3" y1="15"   x2="19.7" y2="15"/>
+          </g>
+          <path d="M9.4 16.4a6.6 6.6 0 0 0 13.2 0" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+          <rect x="15.2" y="22" width="1.6" height="3.6" rx="0.8" fill="#fff"/>
+          <rect x="12.4" y="24.8" width="7.2" height="1.6" rx="0.8" fill="#fff"/>
         </svg>
         <span>Fix Your Mic</span>
       </div>
@@ -77,16 +96,10 @@
           </div>
 
           <div class="suggestions-row">
-            <span class="sug-label">Try:</span>
-            <div class="sug-chips">
-              <button class="sug-chip" data-channel="xqcow">xQc</button>
-              <button class="sug-chip" data-channel="ludwig">Ludwig</button>
-              <button class="sug-chip" data-channel="pokimane">Pokimane</button>
-              <button class="sug-chip" data-channel="hasanabi">HasanAbi</button>
-              <button class="sug-chip" data-channel="mizkif">Mizkif</button>
-              <button class="sug-chip" data-channel="shroud">shroud</button>
+            <span class="sug-label">Live now:</span>
+            <div class="sug-chips" id="sug-chips">
+              <span class="sug-loading">loading top streams…</span>
             </div>
-            <span class="sug-note">· channel must be live</span>
           </div>
 
           <details class="advanced-toggle">

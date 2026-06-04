@@ -21,6 +21,55 @@ try {
 }
 console.log(`streamlink: ${STREAMLINK_BIN}`);
 
+// Curated fallback if the Twitch directory query fails — big, almost-always-live names.
+const FALLBACK_TOP = [
+  { login: 'caseoh_', display: 'CaseOh' },
+  { login: 'xqc', display: 'xQc' },
+  { login: 'jynxzi', display: 'Jynxzi' },
+  { login: 'kaicenat', display: 'Kai Cenat' },
+  { login: 'summit1g', display: 'summit1g' },
+  { login: 'tarik', display: 'tarik' },
+];
+
+// Cache top-live results for 60s to avoid hammering Twitch GQL on every page load.
+let topCache = { data: null, ts: 0 };
+
+// Returns currently-live top Twitch channels for the suggestion chips.
+app.get('/api/top', async (req, res) => {
+  const now = Date.now();
+  if (topCache.data && now - topCache.ts < 60000) {
+    return res.json({ channels: topCache.data, cached: true });
+  }
+  try {
+    const query = 'query{streams(first:12,options:{sort:VIEWER_COUNT}){edges{node{viewersCount broadcaster{login displayName} game{displayName}}}}}';
+    const r = await fetch('https://gql.twitch.tv/gql', {
+      method: 'POST',
+      headers: { 'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+    });
+    const j = await r.json();
+    const edges = j?.data?.streams?.edges || [];
+    const channels = edges
+      .filter(e => e?.node?.broadcaster?.login)
+      .map(e => ({
+        login: e.node.broadcaster.login,
+        display: e.node.broadcaster.displayName || e.node.broadcaster.login,
+        viewers: e.node.viewersCount,
+        game: e.node.game?.displayName || '',
+      }))
+      .slice(0, 6);
+
+    if (channels.length) {
+      topCache = { data: channels, ts: now };
+      return res.json({ channels });
+    }
+    res.json({ channels: FALLBACK_TOP });
+  } catch (err) {
+    console.error('top error:', err.message);
+    res.json({ channels: FALLBACK_TOP });
+  }
+});
+
 // Resolve any live stream URL to a playable HLS URL via streamlink.
 // Supports Twitch, YouTube Live, Kick, and many other platforms.
 // Returns { url } — the CDN HLS URL with CORS * that hls.js can load directly.

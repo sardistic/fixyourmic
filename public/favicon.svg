@@ -1,14 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="7" fill="#7c3aed"/>
-  <!-- mic body -->
-  <rect x="11" y="3" width="10" height="15" rx="5" fill="white"/>
-  <!-- mic arc / stand arm -->
-  <path d="M6 16a10 10 0 0 0 20 0" stroke="white" stroke-width="2.2" fill="none" stroke-linecap="round"/>
-  <!-- stand pole -->
-  <line x1="16" y1="26" x2="16" y2="29.5" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
-  <!-- stand base -->
-  <line x1="11" y1="29.5" x2="21" y2="29.5" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
-  <!-- mic grille lines (subtle) -->
-  <line x1="11" y1="10" x2="21" y2="10" stroke="#7c3aed" stroke-width="1" opacity="0.4"/>
-  <line x1="11" y1="13" x2="21" y2="13" stroke="#7c3aed" stroke-width="1" opacity="0.4"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Fix Your Mic — mic capsule as a level meter (green→red) -->
+  <rect width="512" height="512" rx="116" fill="#13131c"/>
+  <defs>
+    <clipPath id="cap"><rect x="196" y="96" width="120" height="216" rx="60"/></clipPath>
+  </defs>
+  <g clip-path="url(#cap)">
+    <rect x="196" y="96"  width="120" height="120" fill="#22c55e"/>
+    <rect x="196" y="216" width="120" height="54"  fill="#f59e0b"/>
+    <rect x="196" y="270" width="120" height="42"  fill="#ef4444"/>
+  </g>
+  <g stroke="#13131c" stroke-width="7">
+    <line x1="200" y1="150" x2="312" y2="150"/>
+    <line x1="200" y1="188" x2="312" y2="188"/>
+    <line x1="200" y1="240" x2="312" y2="240"/>
+  </g>
+  <path d="M156 256 a100 100 0 0 0 200 0" fill="none" stroke="#fff" stroke-width="24" stroke-linecap="round"/>
+  <rect x="244" y="352" width="24" height="54" rx="12" fill="#fff"/>
+  <rect x="198" y="394" width="116" height="24" rx="12" fill="#fff"/>
 </svg>

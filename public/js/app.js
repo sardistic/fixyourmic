@@ -28,14 +28,37 @@ document.querySelectorAll('.ct-chip').forEach(chip => {
   });
 });
 
-// Suggestion chips — populate the input and focus
-document.querySelectorAll('.sug-chip').forEach(chip => {
-  chip.addEventListener('click', () => {
-    const input = document.getElementById('stream-url-input');
-    input.value = chip.dataset.channel;
-    input.focus();
-  });
-});
+// Live-now suggestion chips — populated from /api/top (real currently-live channels)
+async function loadTopStreams() {
+  const container = document.getElementById('sug-chips');
+  if (!container) return;
+  try {
+    const res = await fetch('/api/top');
+    const data = await res.json();
+    const channels = data.channels || [];
+    if (!channels.length) { container.innerHTML = '<span class="sug-loading">none found</span>'; return; }
+    container.innerHTML = channels.map(c => {
+      const v = c.viewers ? formatViewers(c.viewers) : '';
+      return `<button class="sug-chip" data-channel="${c.login}" title="${c.game || ''}">
+        ${c.display}${v ? `<span class="sug-viewers">${v}</span>` : ''}
+      </button>`;
+    }).join('');
+    container.querySelectorAll('.sug-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const input = document.getElementById('stream-url-input');
+        input.value = chip.dataset.channel;
+        input.focus();
+      });
+    });
+  } catch {
+    container.innerHTML = '<span class="sug-loading">couldn\'t load — type a channel above</span>';
+  }
+}
+function formatViewers(n) {
+  if (n >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k`;
+  return `${n}`;
+}
+loadTopStreams();
 
 // Robust Twitch channel name extractor — handles any URL format the user might paste
 function parseChannelInput(raw) {
