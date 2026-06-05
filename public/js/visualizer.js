@@ -220,7 +220,7 @@ class StreamVisualizer {
     ctx.fill();
   }
 
-  drawHistory(history) {
+  drawHistory(history, targetLufs = -18) {
     const canvas = this.historyCanvas;
     const ctx = this._histCtx;
     if (!ctx || canvas.width === 0) return;
@@ -228,72 +228,130 @@ class StreamVisualizer {
     const W = canvas.width;
     const H = canvas.height;
     const dpr = window.devicePixelRatio;
+    const pad = {
+      left: 54 * dpr,
+      right: 88 * dpr,
+      top: 18 * dpr,
+      bottom: 26 * dpr,
+    };
+    const plotW = Math.max(1, W - pad.left - pad.right);
+    const plotH = Math.max(1, H - pad.top - pad.bottom);
 
     ctx.clearRect(0, 0, W, H);
 
     // Y range: -48 dB to 0 dB
     const DB_MIN = -48;
     const DB_MAX = 0;
-    const toY = db => H - ((Math.max(DB_MIN, Math.min(DB_MAX, db)) - DB_MIN) / (DB_MAX - DB_MIN)) * H;
+    const toY = db => pad.top + plotH - ((Math.max(DB_MIN, Math.min(DB_MAX, db)) - DB_MIN) / (DB_MAX - DB_MIN)) * plotH;
+    const toX = t => {
+      if (history.length < 2) return pad.left;
+      const start = history[0].t;
+      const end = history[history.length - 1].t;
+      const span = Math.max(1, end - start);
+      return pad.left + ((t - start) / span) * plotW;
+    };
 
-    // Grid lines + labels
-    const gridLevels = [0, -3, -6, -14, -18, -23, -36, -48];
-    const labeledLevels = new Set([-3, -14, -23, -48]);
-    ctx.font = `${9 * dpr}px monospace`;
-    ctx.textAlign = 'left';
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.018)';
+    ctx.fillRect(pad.left, pad.top, plotW, plotH);
+
+    // Background bands: near-clipping danger and content target range.
+    ctx.fillStyle = 'rgba(239,68,68,0.10)';
+    ctx.fillRect(pad.left, pad.top, plotW, Math.max(0, toY(-3) - pad.top));
+
+    const targetTop = toY(targetLufs + 3);
+    const targetBottom = toY(targetLufs - 3);
+    ctx.fillStyle = 'rgba(34,197,94,0.08)';
+    ctx.fillRect(pad.left, targetTop, plotW, targetBottom - targetTop);
+
+    // Y grid lines + labels
+    const gridLevels = [0, -3, -6, -12, -14, -18, -23, -30, -36, -48];
+    const labeledLevels = new Set([0, -3, -14, -18, -23, -36, -48]);
+    ctx.font = `${10 * dpr}px monospace`;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
     for (const db of gridLevels) {
       const y = toY(db);
-      // Highlight platform targets
-      const isTarget = db === -14 || db === -23;
-      ctx.strokeStyle = isTarget ? 'rgba(124,58,237,0.25)' : 'rgba(255,255,255,0.06)';
-      ctx.lineWidth = isTarget ? 1.5 : 1;
-      ctx.setLineDash(isTarget ? [4, 4] : []);
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+      const isReference = db === -14 || db === -18 || db === -23;
+      ctx.strokeStyle = isReference ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.07)';
+      ctx.lineWidth = isReference ? 1.25 * dpr : 1 * dpr;
+      ctx.setLineDash(isReference ? [5 * dpr, 5 * dpr] : []);
+      ctx.beginPath();
+      ctx.moveTo(pad.left, y);
+      ctx.lineTo(pad.left + plotW, y);
+      ctx.stroke();
       ctx.setLineDash([]);
       if (labeledLevels.has(db)) {
-        ctx.fillStyle = isTarget ? 'rgba(124,58,237,0.7)' : 'rgba(255,255,255,0.22)';
-        const label = db === -14 ? '-14 (Twitch)' : db === -23 ? '-23 (Broadcast)' : `${db}`;
-        ctx.fillText(label, 4, y - 3);
+        ctx.fillStyle = db === -3 ? 'rgba(239,68,68,0.70)' : 'rgba(255,255,255,0.42)';
+        ctx.fillText(`${db}`, pad.left - 8 * dpr, y);
       }
     }
 
-    if (history.length < 2) return;
+    // Axis border
+    ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+    ctx.lineWidth = 1 * dpr;
+    ctx.strokeRect(pad.left, pad.top, plotW, plotH);
 
-    // Draw a shaded band between RMS and Peak
+    if (history.length < 2) {
+      ctx.restore();
+      return;
+    }
+
+    // Time grid uses actual timestamps, so pauses or dropped samples do not bend the scale.
+    const elapsed = (history[history.length - 1].t - history[0].t) / 1000;
+    const interval = elapsed > 300 ? 120 : elapsed > 120 ? 60 : elapsed > 60 ? 30 : elapsed > 30 ? 15 : 10;
+    ctx.font = `${9 * dpr}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    for (let sec = interval; sec < elapsed; sec += interval) {
+      const t = history[0].t + sec * 1000;
+      const x = toX(t);
+      ctx.strokeStyle = 'rgba(255,255,255,0.055)';
+      ctx.beginPath();
+      ctx.moveTo(x, pad.top);
+      ctx.lineTo(x, pad.top + plotH);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.28)';
+      ctx.fillText(formatHistoryTime(sec), x, pad.top + plotH + 6 * dpr);
+    }
+
+    // Draw a soft envelope between RMS and Peak to show density without overpowering LUFS.
     ctx.beginPath();
     for (let i = 0; i < history.length; i++) {
-      const x = (i / (history.length - 1)) * W;
+      const x = toX(history[i].t);
       const pk = history[i].peak;
       if (!isFinite(pk)) continue;
       if (i === 0) ctx.moveTo(x, toY(pk));
       else ctx.lineTo(x, toY(pk));
     }
     for (let i = history.length - 1; i >= 0; i--) {
-      const x = (i / (history.length - 1)) * W;
+      const x = toX(history[i].t);
       const rms = history[i].rms;
       if (!isFinite(rms)) continue;
       ctx.lineTo(x, toY(rms));
     }
     ctx.closePath();
-    ctx.fillStyle = 'rgba(239,68,68,0.07)';
+    ctx.fillStyle = 'rgba(6,182,212,0.055)';
     ctx.fill();
 
     // Draw the three lines: Peak, Short-term LUFS, RMS
     const lines = [
-      { key: 'peak', color: 'rgba(239,68,68,0.85)',   width: 1.5, label: 'Peak' },
-      { key: 'lufs', color: 'rgba(124,58,237,0.95)',  width: 2,   label: 'LUFS' },
-      { key: 'rms',  color: 'rgba(6,182,212,0.75)',   width: 1.5, label: 'RMS'  },
+      { key: 'peak', color: 'rgba(239,68,68,0.82)',  width: 1.35, label: 'Peak' },
+      { key: 'rms',  color: 'rgba(6,182,212,0.68)',  width: 1.35, label: 'RMS'  },
+      { key: 'lufs', color: 'rgba(168,85,247,0.98)', width: 2.6,  label: 'LUFS' },
     ];
 
     for (const line of lines) {
       ctx.strokeStyle = line.color;
       ctx.lineWidth = line.width * dpr;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
       ctx.beginPath();
       let started = false;
       for (let i = 0; i < history.length; i++) {
         const v = history[i][line.key];
         if (!isFinite(v)) { started = false; continue; }
-        const x = (i / (history.length - 1)) * W;
+        const x = toX(history[i].t);
         const y = toY(v);
         if (!started) { ctx.moveTo(x, y); started = true; }
         else ctx.lineTo(x, y);
@@ -301,23 +359,77 @@ class StreamVisualizer {
       ctx.stroke();
     }
 
-    // Time axis labels
-    const elapsed = (history[history.length - 1].t - history[0].t) / 1000;
-    ctx.fillStyle = 'rgba(255,255,255,0.25)';
-    ctx.font = `${9 * dpr}px monospace`;
-    ctx.textAlign = 'right';
-    ctx.fillText('now', W - 4, H - 4);
-    ctx.textAlign = 'left';
-    if (elapsed > 10) ctx.fillText(`${Math.round(elapsed)}s ago`, 4, H - 4);
-
-    // Legend (top right)
-    ctx.textAlign = 'right';
-    let lx = W - 4;
-    for (const line of [...lines].reverse()) {
-      ctx.fillStyle = line.color;
-      const tw = ctx.measureText(line.label).width + 12;
-      ctx.fillText(line.label, lx, 14 * dpr);
-      lx -= tw;
+    // Current-value tags on the right edge.
+    const latest = history[history.length - 1];
+    const tags = [];
+    for (const line of lines) {
+      const value = latest[line.key];
+      if (!isFinite(value)) continue;
+      tags.push({
+        line,
+        value,
+        y: Math.max(pad.top + 10 * dpr, Math.min(pad.top + plotH - 10 * dpr, toY(value))),
+      });
     }
+    tags.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < tags.length; i++) {
+      tags[i].y = Math.max(tags[i].y, tags[i - 1].y + 18 * dpr);
+    }
+    for (let i = tags.length - 2; i >= 0; i--) {
+      tags[i].y = Math.min(tags[i].y, tags[i + 1].y - 18 * dpr);
+    }
+    for (const tag of tags) {
+      const y = Math.max(pad.top + 10 * dpr, Math.min(pad.top + plotH - 10 * dpr, tag.y));
+      const label = `${tag.line.label} ${tag.value.toFixed(1)}`;
+      ctx.font = `${9 * dpr}px monospace`;
+      const tw = ctx.measureText(label).width;
+      const x = pad.left + plotW + 7 * dpr;
+      ctx.fillStyle = 'rgba(15,23,42,0.88)';
+      ctx.strokeStyle = tag.line.color;
+      ctx.lineWidth = 1 * dpr;
+      roundRect(ctx, x, y - 8 * dpr, tw + 8 * dpr, 16 * dpr, 4 * dpr);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = tag.line.color;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, x + 4 * dpr, y);
+    }
+
+    // Axis labels and endpoints.
+    ctx.fillStyle = 'rgba(255,255,255,0.34)';
+    ctx.font = `${9 * dpr}px monospace`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText('dBFS / LUFS', pad.left, 4 * dpr);
+    ctx.textAlign = 'right';
+    ctx.fillText('now', pad.left + plotW, pad.top + plotH + 6 * dpr);
+    ctx.textAlign = 'left';
+    ctx.fillText(`${formatHistoryTime(elapsed)} ago`, pad.left, pad.top + plotH + 6 * dpr);
+
+    ctx.restore();
   }
+}
+
+function formatHistoryTime(seconds) {
+  if (seconds >= 60) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.round(seconds % 60);
+    return s ? `${m}:${String(s).padStart(2, '0')}` : `${m}m`;
+  }
+  return `${Math.round(seconds)}s`;
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.lineTo(x + w - rr, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + rr);
+  ctx.lineTo(x + w, y + h - rr);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+  ctx.lineTo(x + rr, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - rr);
+  ctx.lineTo(x, y + rr);
+  ctx.quadraticCurveTo(x, y, x + rr, y);
 }

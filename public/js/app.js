@@ -274,7 +274,7 @@ function renderLoop() {
 
   visualizer.drawSpectrum(freqData, audioCtx.sampleRate);
   visualizer.drawWaveform(timeData);
-  visualizer.drawHistory(history);
+  visualizer.drawHistory(history, TARGET_LUFS);
   if (history.length >= 2) document.getElementById('history-empty')?.classList.add('hidden');
 
   updateMetricsUI(metrics);

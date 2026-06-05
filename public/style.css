@@ -475,7 +475,7 @@ input[type="text"].full-width:focus { border-color: var(--accent); }
 /* History chart */
 .history-card { position: relative; }
 .history-card canvas {
-  width: 100%; height: 150px;
+  width: 100%; height: 190px;
   display: block;
   border-radius: 6px;
   background: var(--bg);
