@@ -147,7 +147,7 @@ async function resolveAndLoad(streamUrl) {
 
 // ── HLS loading ───────────────────────────────────────────────────────────────
 function loadHls(url, label) {
-  stopAnalysis();
+  stopAnalysis({ showReport: false });
   setStatus('connecting', `Connecting to ${label}...`);
 
   if (!Hls.isSupported() && !video.canPlayType('application/vnd.apple.mpegurl')) {
@@ -542,9 +542,10 @@ function renderRecommendations(recs) {
 }
 
 // ── Stop / cleanup ────────────────────────────────────────────────────────────
-function stopAnalysis() {
+function stopAnalysis(options = {}) {
+  const shouldShowReport = options.showReport !== false;
   // Snapshot report data before teardown
-  const hasData = history.length >= 10;
+  const hasData = shouldShowReport && history.length >= 10;
   let reportSnapshot = null;
   if (hasData) {
     const histCanvas = document.getElementById('history-canvas');
@@ -576,9 +577,26 @@ function stopAnalysis() {
 
   if (reportSnapshot) {
     showReport(reportSnapshot);
-  } else {
+  } else if (shouldShowReport) {
     document.getElementById('landing')?.classList.remove('hidden');
   }
+}
+
+function startNewAnalysis() {
+  const report = document.getElementById('report');
+  report?.classList.add('hidden');
+  if (report) report.innerHTML = '';
+
+  dashboard.classList.add('hidden');
+  statusBar.classList.add('hidden');
+  document.getElementById('landing')?.classList.remove('hidden');
+  document.querySelector('.input-section')?.classList.remove('hidden');
+
+  history.length = 0;
+  lastMetrics = null;
+  lastRecs = [];
+  currentStreamLabel = '';
+  analysisStartTime = null;
 }
 
 // ── Volume / mute controls ────────────────────────────────────────────────────
@@ -916,7 +934,7 @@ function showReport(snap) {
   const el = document.getElementById('report');
   el.innerHTML = `
     <div class="rep-toolbar no-print">
-      <button class="btn-primary" onclick="document.getElementById('report').classList.add('hidden'); document.getElementById('landing').classList.remove('hidden');">
+      <button class="btn-primary" onclick="startNewAnalysis()">
         ← New Analysis
       </button>
       <button class="btn-export" onclick="window.print()">
@@ -1021,5 +1039,5 @@ function showReport(snap) {
   `;
 
   el.classList.remove('hidden');
-  document.querySelector('.input-section').classList.add('hidden');
+  document.querySelector('.input-section')?.classList.add('hidden');
 }
