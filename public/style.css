@@ -610,7 +610,7 @@ input[type="text"].full-width:focus { border-color: var(--accent); }
   grid-template-areas:
     "grade vu"
     "spectrum vu";
-  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
   gap: 20px;
   align-items: stretch;
 }
@@ -723,7 +723,7 @@ input[type="text"].full-width:focus { border-color: var(--accent); }
 /* ── Metrics grid ── */
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
 }
 
@@ -957,7 +957,6 @@ input[type="text"].full-width:focus { border-color: var(--accent); }
   flex-wrap: wrap;
   position: relative;
   overflow: hidden;
-  min-height: 250px;
 }
 .broadcast-banner > *:not(.bb-waveform-bg) { position: relative; z-index: 2; }
 .bb-waveform-bg {
