@@ -214,7 +214,6 @@
     <div id="status-bar" class="status-bar hidden">
       <div class="status-dot" id="status-dot"></div>
       <span id="status-text">Connecting...</span>
-      <button class="btn-start-playback hidden" id="start-playback-btn">Start analysis</button>
       <button class="btn-new-stream" id="new-stream-btn">New stream</button>
       <div class="volume-control">
         <button class="btn-mute" id="mute-btn" title="Mute/unmute">
@@ -234,6 +233,28 @@
 
       <!-- Top row: spectrum + VU meters -->
       <div class="dashboard-top">
+
+        <!-- Broadcast score banner -->
+        <div class="broadcast-banner card" id="broadcast-banner">
+          <canvas id="waveform-canvas" class="bb-waveform-bg"></canvas>
+          <div class="bb-left">
+            <div class="bb-grade-wrap">
+              <span class="bb-grade" id="bb-grade">—</span>
+              <span class="bb-grade-label">Broadcast<br>Grade</span>
+            </div>
+            <div class="bb-score-wrap">
+              <div class="bb-score-label">Broadcast Quality Score</div>
+              <div class="bb-bar-track">
+                <div class="bb-bar-fill" id="bb-fill"></div>
+                <div class="bb-bar-target" title="-14 LUFS target"></div>
+              </div>
+              <div class="bb-score-num"><span id="bb-number">—</span><span class="bb-score-denom">/100</span></div>
+            </div>
+          </div>
+          <div class="bb-issues" id="bb-issues">
+            <span class="bb-placeholder">Collecting data…</span>
+          </div>
+        </div>
 
         <div class="card spectrum-card">
           <div class="card-header">
@@ -284,28 +305,6 @@
 
       </div>
 
-      <!-- Broadcast score banner -->
-      <div class="broadcast-banner card" id="broadcast-banner">
-        <canvas id="waveform-canvas" class="bb-waveform-bg"></canvas>
-        <div class="bb-left">
-          <div class="bb-grade-wrap">
-            <span class="bb-grade" id="bb-grade">—</span>
-            <span class="bb-grade-label">Broadcast<br>Grade</span>
-          </div>
-          <div class="bb-score-wrap">
-            <div class="bb-score-label">Broadcast Quality Score</div>
-            <div class="bb-bar-track">
-              <div class="bb-bar-fill" id="bb-fill"></div>
-              <div class="bb-bar-target" title="-14 LUFS target"></div>
-            </div>
-            <div class="bb-score-num"><span id="bb-number">—</span><span class="bb-score-denom">/100</span></div>
-          </div>
-        </div>
-        <div class="bb-issues" id="bb-issues">
-          <span class="bb-placeholder">Collecting data…</span>
-        </div>
-      </div>
-
       <!-- History chart — full width -->
       <div class="card history-card">
         <div class="card-header">
@@ -320,17 +319,6 @@
         <div class="history-empty" id="history-empty">Collecting data&hellip;</div>
         <div class="history-grade-strip" id="history-grade-strip" aria-label="Broadcast grade over time">
           <span class="history-grade-empty">Grade timeline appears after a few samples</span>
-        </div>
-      </div>
-
-      <!-- Broadcast corrections -->
-      <div class="card corrections-card">
-        <div class="corrections-header">
-          <h2>Corrections Needed</h2>
-          <span class="corrections-sub">Exact adjustments for the selected content target</span>
-        </div>
-        <div id="corrections-list" class="corrections-list">
-          <div class="corr-placeholder">Collecting data — corrections appear after a few seconds of analysis.</div>
         </div>
       </div>
 
@@ -422,54 +410,65 @@
           </div>
         </div>
 
-        <div class="card metric-card">
-          <h3>Frequency Balance</h3>
-          <div class="band-chart" id="band-chart">
-            <div class="band-item">
-              <div class="band-bar-wrap">
-                <div class="band-fill sub" id="band-sub"></div>
-              </div>
-              <div class="band-name">Sub<br><small>20–60</small></div>
-              <div class="band-db" id="band-sub-db">—</div>
+      </div>
+
+      <div class="card frequency-balance-card">
+        <h3>Frequency Balance</h3>
+        <div class="band-chart" id="band-chart">
+          <div class="band-item">
+            <div class="band-bar-wrap">
+              <div class="band-fill sub" id="band-sub"></div>
             </div>
-            <div class="band-item">
-              <div class="band-bar-wrap">
-                <div class="band-fill bass" id="band-bass"></div>
-              </div>
-              <div class="band-name">Bass<br><small>60–250</small></div>
-              <div class="band-db" id="band-bass-db">—</div>
+            <div class="band-name">Sub<br><small>20–60</small></div>
+            <div class="band-db" id="band-sub-db">—</div>
+          </div>
+          <div class="band-item">
+            <div class="band-bar-wrap">
+              <div class="band-fill bass" id="band-bass"></div>
             </div>
-            <div class="band-item">
-              <div class="band-bar-wrap">
-                <div class="band-fill lowmid" id="band-lowmid"></div>
-              </div>
-              <div class="band-name">Low-Mid<br><small>250–800</small></div>
-              <div class="band-db" id="band-lowmid-db">—</div>
+            <div class="band-name">Bass<br><small>60–250</small></div>
+            <div class="band-db" id="band-bass-db">—</div>
+          </div>
+          <div class="band-item">
+            <div class="band-bar-wrap">
+              <div class="band-fill lowmid" id="band-lowmid"></div>
             </div>
-            <div class="band-item">
-              <div class="band-bar-wrap">
-                <div class="band-fill mid" id="band-mid"></div>
-              </div>
-              <div class="band-name">Mid<br><small>800–3k</small></div>
-              <div class="band-db" id="band-mid-db">—</div>
+            <div class="band-name">Low-Mid<br><small>250–800</small></div>
+            <div class="band-db" id="band-lowmid-db">—</div>
+          </div>
+          <div class="band-item">
+            <div class="band-bar-wrap">
+              <div class="band-fill mid" id="band-mid"></div>
             </div>
-            <div class="band-item">
-              <div class="band-bar-wrap">
-                <div class="band-fill presence" id="band-presence"></div>
-              </div>
-              <div class="band-name">Presence<br><small>3k–8k</small></div>
-              <div class="band-db" id="band-presence-db">—</div>
+            <div class="band-name">Mid<br><small>800–3k</small></div>
+            <div class="band-db" id="band-mid-db">—</div>
+          </div>
+          <div class="band-item">
+            <div class="band-bar-wrap">
+              <div class="band-fill presence" id="band-presence"></div>
             </div>
-            <div class="band-item">
-              <div class="band-bar-wrap">
-                <div class="band-fill air" id="band-air"></div>
-              </div>
-              <div class="band-name">Air<br><small>8k–20k</small></div>
-              <div class="band-db" id="band-air-db">—</div>
+            <div class="band-name">Presence<br><small>3k–8k</small></div>
+            <div class="band-db" id="band-presence-db">—</div>
+          </div>
+          <div class="band-item">
+            <div class="band-bar-wrap">
+              <div class="band-fill air" id="band-air"></div>
             </div>
+            <div class="band-name">Air<br><small>8k–20k</small></div>
+            <div class="band-db" id="band-air-db">—</div>
           </div>
         </div>
+      </div>
 
+      <!-- Broadcast corrections -->
+      <div class="card corrections-card">
+        <div class="corrections-header">
+          <h2>Corrections Needed</h2>
+          <span class="corrections-sub">Exact adjustments for the selected content target</span>
+        </div>
+        <div id="corrections-list" class="corrections-list">
+          <div class="corr-placeholder">Collecting data — corrections appear after a few seconds of analysis.</div>
+        </div>
       </div>
 
       <div class="card platform-card">

@@ -112,7 +112,6 @@ let visualizer = null;
 let animFrame = null;
 let running = false;
 let analysisStartTime = null;
-let pendingStream = null;
 
 // ── Tabs ────────────────────────────────────────────────────────────────────
 document.querySelectorAll('.tab').forEach(tab => {
@@ -140,20 +139,13 @@ document.getElementById('stream-url-input').addEventListener('keydown', e => {
 document.getElementById('analyze-url').addEventListener('click', () => {
   const url = document.getElementById('url-input').value.trim();
   if (!url) return;
-  loadHls(`/proxy?url=${encodeURIComponent(url)}`, url, { userGesture: true });
+  loadHls(`/proxy?url=${encodeURIComponent(url)}`, url);
 });
 document.getElementById('url-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('analyze-url').click();
 });
 
 document.getElementById('stop-btn').addEventListener('click', stopAnalysis);
-document.getElementById('start-playback-btn')?.addEventListener('click', () => {
-  if (!pendingStream) return;
-  const { url, label } = pendingStream;
-  pendingStream = null;
-  document.getElementById('start-playback-btn')?.classList.add('hidden');
-  loadHls(url, label, { userGesture: true });
-});
 document.getElementById('new-stream-btn')?.addEventListener('click', () => {
   const landing = document.getElementById('landing');
   const isOpen = landing && !landing.classList.contains('hidden') && landing.classList.contains('live-switcher');
@@ -175,20 +167,16 @@ async function resolveAndLoad(streamUrl) {
       setStatus('error', data.error);
       return;
     }
-    pendingStream = { url: data.url, label: streamUrl };
-    const startBtn = document.getElementById('start-playback-btn');
-    startBtn?.classList.remove('hidden');
-    setStatus('connecting', 'Stream ready. Click Start analysis to begin playback.');
+    loadHls(data.url, streamUrl);
   } catch (err) {
     setStatus('error', `Network error: ${err.message}`);
   }
 }
 
 // ── HLS loading ───────────────────────────────────────────────────────────────
-function loadHls(url, label, options = {}) {
+function loadHls(url, label) {
   stopAnalysis({ showReport: false, preserveUi: true });
   setStatus('connecting', `Connecting to ${label}...`);
-  document.getElementById('start-playback-btn')?.classList.add('hidden');
 
   if (!Hls.isSupported() && !video.canPlayType('application/vnd.apple.mpegurl')) {
     setStatus('error', 'HLS is not supported in this browser. Try Chrome or Firefox.');
@@ -203,11 +191,6 @@ function loadHls(url, label, options = {}) {
     });
     hls.loadSource(url);
     hls.attachMedia(video);
-    let earlyPlay = null;
-    if (options.userGesture) {
-      earlyPlay = video.play();
-      earlyPlay.catch(() => {});
-    }
 
     hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
       // Pick the lowest quality variant to reduce bandwidth (we only care about audio)
@@ -216,8 +199,7 @@ function loadHls(url, label, options = {}) {
       }, 0);
       hls.currentLevel = lowestLevel;
 
-      const play = earlyPlay || video.play();
-      play.then(async () => {
+      video.play().then(async () => {
         currentStreamLabel = label;
         setStatus('live', `Live: ${label}`);
         await initAudioAnalysis();
@@ -242,8 +224,7 @@ function loadHls(url, label, options = {}) {
 
 function handlePlaybackError(err) {
   if (err?.name === 'NotAllowedError' || /user didn't interact|user gesture|not allowed/i.test(err?.message || '')) {
-    setStatus('error', 'Playback was blocked by the browser. Click Start analysis to begin playback.');
-    if (pendingStream) document.getElementById('start-playback-btn')?.classList.remove('hidden');
+    setStatus('error', 'Playback was blocked by the browser. Click Analyze again to start the stream.');
     return;
   }
   setStatus('error', `Playback error: ${err?.message || 'Unable to start playback.'}`);
