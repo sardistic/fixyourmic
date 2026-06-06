@@ -103,6 +103,7 @@ function resetAnalysisRoute() {
 
 let hls = null;
 let audioCtx = null;
+let mediaSourceNode = null;
 let analyzer = null;
 let currentStreamLabel = '';
 let lastMetrics = null;
@@ -111,6 +112,7 @@ let visualizer = null;
 let animFrame = null;
 let running = false;
 let analysisStartTime = null;
+let pendingStream = null;
 
 // ── Tabs ────────────────────────────────────────────────────────────────────
 document.querySelectorAll('.tab').forEach(tab => {
@@ -138,13 +140,28 @@ document.getElementById('stream-url-input').addEventListener('keydown', e => {
 document.getElementById('analyze-url').addEventListener('click', () => {
   const url = document.getElementById('url-input').value.trim();
   if (!url) return;
-  loadHls(`/proxy?url=${encodeURIComponent(url)}`, url);
+  loadHls(`/proxy?url=${encodeURIComponent(url)}`, url, { userGesture: true });
 });
 document.getElementById('url-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('analyze-url').click();
 });
 
 document.getElementById('stop-btn').addEventListener('click', stopAnalysis);
+document.getElementById('start-playback-btn')?.addEventListener('click', () => {
+  if (!pendingStream) return;
+  const { url, label } = pendingStream;
+  pendingStream = null;
+  document.getElementById('start-playback-btn')?.classList.add('hidden');
+  loadHls(url, label, { userGesture: true });
+});
+document.getElementById('new-stream-btn')?.addEventListener('click', () => {
+  const landing = document.getElementById('landing');
+  const isOpen = landing && !landing.classList.contains('hidden') && landing.classList.contains('live-switcher');
+  if (!landing) return;
+  landing.classList.toggle('hidden', isOpen);
+  landing.classList.toggle('live-switcher', !isOpen);
+  if (!isOpen) document.getElementById('stream-url-input')?.focus();
+});
 
 // ── Resolve stream URL via streamlink then load ───────────────────────────────
 async function resolveAndLoad(streamUrl) {
@@ -158,16 +175,20 @@ async function resolveAndLoad(streamUrl) {
       setStatus('error', data.error);
       return;
     }
-    loadHls(data.url, streamUrl);
+    pendingStream = { url: data.url, label: streamUrl };
+    const startBtn = document.getElementById('start-playback-btn');
+    startBtn?.classList.remove('hidden');
+    setStatus('connecting', 'Stream ready. Click Start analysis to begin playback.');
   } catch (err) {
     setStatus('error', `Network error: ${err.message}`);
   }
 }
 
 // ── HLS loading ───────────────────────────────────────────────────────────────
-function loadHls(url, label) {
-  stopAnalysis({ showReport: false });
+function loadHls(url, label, options = {}) {
+  stopAnalysis({ showReport: false, preserveUi: true });
   setStatus('connecting', `Connecting to ${label}...`);
+  document.getElementById('start-playback-btn')?.classList.add('hidden');
 
   if (!Hls.isSupported() && !video.canPlayType('application/vnd.apple.mpegurl')) {
     setStatus('error', 'HLS is not supported in this browser. Try Chrome or Firefox.');
@@ -182,6 +203,11 @@ function loadHls(url, label) {
     });
     hls.loadSource(url);
     hls.attachMedia(video);
+    let earlyPlay = null;
+    if (options.userGesture) {
+      earlyPlay = video.play();
+      earlyPlay.catch(() => {});
+    }
 
     hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
       // Pick the lowest quality variant to reduce bandwidth (we only care about audio)
@@ -190,7 +216,8 @@ function loadHls(url, label) {
       }, 0);
       hls.currentLevel = lowestLevel;
 
-      video.play().then(async () => {
+      const play = earlyPlay || video.play();
+      play.then(async () => {
         currentStreamLabel = label;
         setStatus('live', `Live: ${label}`);
         await initAudioAnalysis();
@@ -215,7 +242,8 @@ function loadHls(url, label) {
 
 function handlePlaybackError(err) {
   if (err?.name === 'NotAllowedError' || /user didn't interact|user gesture|not allowed/i.test(err?.message || '')) {
-    setStatus('error', 'Playback was blocked by the browser. Click Analyze again to start the stream.');
+    setStatus('error', 'Playback was blocked by the browser. Click Start analysis to begin playback.');
+    if (pendingStream) document.getElementById('start-playback-btn')?.classList.remove('hidden');
     return;
   }
   setStatus('error', `Playback error: ${err?.message || 'Unable to start playback.'}`);
@@ -223,12 +251,15 @@ function handlePlaybackError(err) {
 
 // ── Audio analysis setup (from video element) ────────────────────────────────
 async function initAudioAnalysis() {
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (!audioCtx || audioCtx.state === 'closed') {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    mediaSourceNode = null;
+  }
   // Must await resume — browser suspends new AudioContexts until user gesture unlocks them
   await audioCtx.resume();
 
-  const source = audioCtx.createMediaElementSource(video);
-  _startAnalyzerFromNode(source);
+  if (!mediaSourceNode) mediaSourceNode = audioCtx.createMediaElementSource(video);
+  _startAnalyzerFromNode(mediaSourceNode);
 }
 
 let recInterval = null;
@@ -258,6 +289,7 @@ function _startAnalyzerFromNode(sourceNode) {
   );
 
   history.length = 0;
+  updateHistoryGradeStrip();
   document.getElementById('history-empty')?.classList.remove('hidden');
   dashboard.classList.remove('hidden');
   running = true;
@@ -272,8 +304,10 @@ function _startAnalyzerFromNode(sourceNode) {
       lufs: m.lufsShortTerm,
       peak: m.peakHoldDB,
       rms: m.rmsDB,
+      score: m.hasEnoughData ? calculateBroadcastAssessment(m).score : null,
     });
     if (history.length > MAX_HISTORY) history.shift();
+    updateHistoryGradeStrip();
   }, 1000);
 
   // Update recommendations every 5 seconds once enough data is collected
@@ -394,6 +428,7 @@ function updateMetricsUI(m) {
 
   // Platform comparison
   updatePlatformStatus(m.lufsIntegrated);
+  updateSpectrumSummary(m.bands);
 }
 
 function updateVuMeters(peakL, peakR) {
@@ -431,8 +466,11 @@ function updateVuPeakHold(id, peak) {
 
 function updatePlatformStatus(lufs) {
   if (!isFinite(lufs)) return;
+  const contentLabel = document.getElementById('target-preset').selectedOptions[0]?.text.split('(')[0].trim() || 'Selected content';
+  setText('plat-content-ref', `${contentLabel} · ${TARGET_LUFS} LUFS`);
 
   const targets = [
+    { id: 'plat-content-status',   target: TARGET_LUFS, tol: 2, mode: 'target' },
     { id: 'plat-twitch-status',    target: -14, tol: 3, mode: 'max' },
     { id: 'plat-youtube-status',   target: -14, tol: 2, mode: 'target' },
     { id: 'plat-discord-status',   target: -16, tol: 2, mode: 'target' },
@@ -463,6 +501,69 @@ function updatePlatformStatus(lufs) {
 
     el.innerHTML = `<span class="status-badge ${cls}">${label}</span>`;
   }
+}
+
+function updateHistoryGradeStrip() {
+  const el = document.getElementById('history-grade-strip');
+  if (!el) return;
+  const scored = history.filter(h => Number.isFinite(h.score));
+  if (!scored.length) {
+    el.innerHTML = '<span class="history-grade-empty">Grade timeline appears after a few samples</span>';
+    return;
+  }
+
+  const maxBars = 72;
+  const step = Math.max(1, Math.ceil(scored.length / maxBars));
+  const buckets = [];
+  for (let i = 0; i < scored.length; i += step) {
+    const slice = scored.slice(i, i + step);
+    const avg = slice.reduce((sum, h) => sum + h.score, 0) / slice.length;
+    const first = slice[0];
+    const cls = avg >= 85 ? 'good' : avg >= 70 ? 'warn' : 'bad';
+    buckets.push({ score: avg, cls, t: first.t });
+  }
+
+  el.innerHTML = buckets.map(b => {
+    const h = Math.max(18, Math.min(100, b.score));
+    const label = `${Math.round(b.score)}/100 at ${new Date(b.t).toLocaleTimeString()}`;
+    return `<span class="history-grade-bar ${b.cls}" style="height:${h}%" title="${label}"></span>`;
+  }).join('');
+}
+
+function updateSpectrumSummary(bands) {
+  const el = document.getElementById('spectrum-summary');
+  if (!el || !bands) return;
+  const entries = [
+    { key: 'sub', label: 'Sub', value: bands.sub },
+    { key: 'bass', label: 'Bass', value: bands.bass },
+    { key: 'lowmid', label: 'Low-mid', value: bands.lowMid },
+    { key: 'mid', label: 'Mids', value: bands.mid },
+    { key: 'presence', label: 'Presence', value: bands.presence },
+    { key: 'air', label: 'Air', value: bands.air },
+  ].filter(b => isFinite(b.value));
+  if (!entries.length) {
+    el.innerHTML = '<span>Collecting frequency profile…</span>';
+    return;
+  }
+
+  const sorted = [...entries].sort((a, b) => b.value - a.value);
+  const strongest = sorted[0];
+  const weakest = sorted[sorted.length - 1];
+  const low = avg(entries.filter(b => ['sub', 'bass', 'lowmid'].includes(b.key)).map(b => b.value));
+  const high = avg(entries.filter(b => ['presence', 'air'].includes(b.key)).map(b => b.value));
+  const tilt = low - high;
+  const tiltLabel = tilt > 8 ? 'warm / bass-forward' : tilt < -8 ? 'bright / top-heavy' : 'fairly even';
+
+  el.innerHTML = `
+    <span>Strongest: <strong class="spec-${strongest.key}">${strongest.label}</strong> ${Math.round(strongest.value)} dB</span>
+    <span>Weakest: <strong class="spec-${weakest.key}">${weakest.label}</strong> ${Math.round(weakest.value)} dB</span>
+    <span>Tilt: <strong>${tiltLabel}</strong></span>
+  `;
+}
+
+function avg(values) {
+  const finite = values.filter(isFinite);
+  return finite.length ? finite.reduce((sum, v) => sum + v, 0) / finite.length : NaN;
 }
 
 // ── Recommendations engine ────────────────────────────────────────────────────
@@ -571,6 +672,7 @@ function renderRecommendations(recs) {
 // ── Stop / cleanup ────────────────────────────────────────────────────────────
 function stopAnalysis(options = {}) {
   const shouldShowReport = options.showReport !== false;
+  const preserveUi = options.preserveUi === true;
   // Snapshot report data before teardown
   const hasData = shouldShowReport && history.length >= 10;
   let reportSnapshot = null;
@@ -596,11 +698,13 @@ function stopAnalysis(options = {}) {
   if (hls) { hls.destroy(); hls = null; }
   video.pause();
   video.src = '';
+  try { mediaSourceNode?.disconnect(); } catch {}
   if (analyzer) { analyzer.disconnect(); analyzer = null; }
-  if (audioCtx) { audioCtx.close(); audioCtx = null; }
-  if (listenerGain) { listenerGain = null; }
-  dashboard.classList.add('hidden');
-  statusBar.classList.add('hidden');
+  if (listenerGain) { try { listenerGain.disconnect(); } catch {} listenerGain = null; }
+  if (!preserveUi) {
+    dashboard.classList.add('hidden');
+    statusBar.classList.add('hidden');
+  }
 
   if (reportSnapshot) {
     showReport(reportSnapshot);
@@ -614,6 +718,7 @@ function startNewAnalysis() {
   report?.classList.add('hidden');
   if (report) report.innerHTML = '';
 
+  document.getElementById('landing')?.classList.remove('live-switcher');
   dashboard.classList.add('hidden');
   statusBar.classList.add('hidden');
   document.getElementById('landing')?.classList.remove('hidden');
@@ -664,7 +769,9 @@ document.getElementById('mute-btn').addEventListener('click', () => {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function setStatus(state, text) {
   statusBar.classList.remove('hidden');
-  document.getElementById('landing')?.classList.add('hidden');
+  const landing = document.getElementById('landing');
+  landing?.classList.add('hidden');
+  landing?.classList.remove('live-switcher');
   statusDot.className = `status-dot ${state}`;
   statusText.textContent = text;
 }
@@ -705,7 +812,26 @@ function peakDB_color(db) {
 // ── Broadcast score ───────────────────────────────────────────────────────────
 function updateBroadcastScore(m) {
   if (!isFinite(m.lufsIntegrated)) return;
+  const { score, grade, gradeCls, issues } = calculateBroadcastAssessment(m);
 
+  const gradeEl = document.getElementById('bb-grade');
+  const numEl   = document.getElementById('bb-number');
+  const fillEl  = document.getElementById('bb-fill');
+  const issuesEl = document.getElementById('bb-issues');
+  if (!gradeEl) return;
+
+  gradeEl.textContent = grade;
+  gradeEl.className = `bb-grade ${gradeCls}`;
+  numEl.textContent = score;
+  fillEl.style.width = `${score}%`;
+  fillEl.className = `bb-bar-fill ${score >= 85 ? 'fill-good' : score >= 70 ? 'fill-warn' : 'fill-bad'}`;
+
+  issuesEl.innerHTML = issues.map(i =>
+    `<div class="bb-issue bb-${i.cls}"><span class="bb-dot"></span>${i.text}</div>`
+  ).join('');
+}
+
+function calculateBroadcastAssessment(m) {
   let score = 100;
   const issues = [];
 
@@ -748,22 +874,7 @@ function updateBroadcastScore(m) {
   score = Math.max(0, Math.round(score));
   const grade = score >= 95 ? 'A+' : score >= 90 ? 'A' : score >= 85 ? 'B+' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'F';
   const gradeCls = score >= 85 ? 'grade-good' : score >= 70 ? 'grade-warn' : 'grade-bad';
-
-  const gradeEl = document.getElementById('bb-grade');
-  const numEl   = document.getElementById('bb-number');
-  const fillEl  = document.getElementById('bb-fill');
-  const issuesEl = document.getElementById('bb-issues');
-  if (!gradeEl) return;
-
-  gradeEl.textContent = grade;
-  gradeEl.className = `bb-grade ${gradeCls}`;
-  numEl.textContent = score;
-  fillEl.style.width = `${score}%`;
-  fillEl.className = `bb-bar-fill ${score >= 85 ? 'fill-good' : score >= 70 ? 'fill-warn' : 'fill-bad'}`;
-
-  issuesEl.innerHTML = issues.map(i =>
-    `<div class="bb-issue bb-${i.cls}"><span class="bb-dot"></span>${i.text}</div>`
-  ).join('');
+  return { score, grade, gradeCls, issues };
 }
 
 // ── Broadcast corrections ─────────────────────────────────────────────────────

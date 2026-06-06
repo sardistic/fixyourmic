@@ -214,6 +214,8 @@
     <div id="status-bar" class="status-bar hidden">
       <div class="status-dot" id="status-dot"></div>
       <span id="status-text">Connecting...</span>
+      <button class="btn-start-playback hidden" id="start-playback-btn">Start analysis</button>
+      <button class="btn-new-stream" id="new-stream-btn">New stream</button>
       <div class="volume-control">
         <button class="btn-mute" id="mute-btn" title="Mute/unmute">
           <svg id="mute-icon-on" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
@@ -250,6 +252,9 @@
             <span>500</span><span>1k</span><span>2k</span><span>5k</span>
             <span>10k</span><span>20k Hz</span>
           </div>
+          <div class="spectrum-summary" id="spectrum-summary">
+            <span>Collecting frequency profile…</span>
+          </div>
         </div>
 
         <div class="card vu-card">
@@ -281,6 +286,7 @@
 
       <!-- Broadcast score banner -->
       <div class="broadcast-banner card" id="broadcast-banner">
+        <canvas id="waveform-canvas" class="bb-waveform-bg"></canvas>
         <div class="bb-left">
           <div class="bb-grade-wrap">
             <span class="bb-grade" id="bb-grade">—</span>
@@ -297,6 +303,34 @@
         </div>
         <div class="bb-issues" id="bb-issues">
           <span class="bb-placeholder">Collecting data…</span>
+        </div>
+      </div>
+
+      <!-- History chart — full width -->
+      <div class="card history-card">
+        <div class="card-header">
+          <h2>Level History</h2>
+          <div class="legend">
+            <span class="legend-item" style="color:rgba(239,68,68,0.9)">Peak</span>
+            <span class="legend-item" style="color:rgba(124,58,237,0.95)">LUFS</span>
+            <span class="legend-item" style="color:rgba(6,182,212,0.85)">RMS</span>
+          </div>
+        </div>
+        <canvas id="history-canvas"></canvas>
+        <div class="history-empty" id="history-empty">Collecting data&hellip;</div>
+        <div class="history-grade-strip" id="history-grade-strip" aria-label="Broadcast grade over time">
+          <span class="history-grade-empty">Grade timeline appears after a few samples</span>
+        </div>
+      </div>
+
+      <!-- Broadcast corrections -->
+      <div class="card corrections-card">
+        <div class="corrections-header">
+          <h2>Corrections Needed</h2>
+          <span class="corrections-sub">Exact adjustments for the selected content target</span>
+        </div>
+        <div id="corrections-list" class="corrections-list">
+          <div class="corr-placeholder">Collecting data — corrections appear after a few seconds of analysis.</div>
         </div>
       </div>
 
@@ -438,98 +472,40 @@
 
       </div>
 
-      <!-- Platform comparison + waveform -->
-      <div class="dashboard-bottom">
-
-        <div class="card platform-card">
-          <h2>Platform Targets</h2>
-          <div class="platform-list">
-
-            <div class="platform-row" id="plat-twitch">
-              <div class="plat-icon twitch">
-                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/></svg>
-              </div>
-              <div class="plat-info">
-                <span class="plat-name">Twitch</span>
-                <span class="plat-target">Max −14 LUFS (compressor kicks in above)</span>
-              </div>
-              <div class="plat-status" id="plat-twitch-status">
-                <span class="status-badge neutral">—</span>
-              </div>
-            </div>
-
-            <div class="platform-row" id="plat-youtube">
-              <div class="plat-icon youtube">
-                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.495 6.205a3.007 3.007 0 0 0-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 0 0 .527 6.205a31.247 31.247 0 0 0-.522 5.805 31.247 31.247 0 0 0 .522 5.783 3.007 3.007 0 0 0 2.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 0 0 2.088-2.088 31.247 31.247 0 0 0 .5-5.783 31.247 31.247 0 0 0-.5-5.805zM9.609 15.601V8.408l6.264 3.602z"/></svg>
-              </div>
-              <div class="plat-info">
-                <span class="plat-name">YouTube</span>
-                <span class="plat-target">Normalizes to −14 LUFS (turns down if louder)</span>
-              </div>
-              <div class="plat-status" id="plat-youtube-status">
-                <span class="status-badge neutral">—</span>
-              </div>
-            </div>
-
-            <div class="platform-row" id="plat-discord">
-              <div class="plat-icon discord">
-                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
-              </div>
-              <div class="plat-info">
-                <span class="plat-name">Discord</span>
-                <span class="plat-target">Recommended −16 LUFS for voice clarity</span>
-              </div>
-              <div class="plat-status" id="plat-discord-status">
-                <span class="status-badge neutral">—</span>
-              </div>
-            </div>
-
-            <div class="platform-row">
-              <div class="plat-icon broadcast">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="17 2 12 7 7 2"/></svg>
-              </div>
-              <div class="plat-info">
-                <span class="plat-name">Broadcast (EBU R128)</span>
-                <span class="plat-target">−23 LUFS reference (TV standard)</span>
-              </div>
-              <div class="plat-status" id="plat-broadcast-status">
-                <span class="status-badge neutral">—</span>
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-        <div class="card waveform-card">
-          <div class="card-header">
-            <h2>Waveform</h2>
-          </div>
-          <canvas id="waveform-canvas"></canvas>
-        </div>
-      </div>
-
-      <!-- History chart — full width -->
-      <div class="card history-card">
+      <div class="card platform-card">
         <div class="card-header">
-          <h2>Level History</h2>
-          <div class="legend">
-            <span class="legend-item" style="color:rgba(239,68,68,0.9)">Peak</span>
-            <span class="legend-item" style="color:rgba(124,58,237,0.95)">LUFS</span>
-            <span class="legend-item" style="color:rgba(6,182,212,0.85)">RMS</span>
+          <h2>Targets</h2>
+          <span class="target-note">Measured against current integrated LUFS</span>
+        </div>
+        <div class="target-table">
+          <div class="target-row target-header">
+            <span>Target</span><span>Reference</span><span>Result</span>
           </div>
-        </div>
-        <canvas id="history-canvas"></canvas>
-        <div class="history-empty" id="history-empty">Collecting data&hellip;</div>
-      </div>
-
-      <!-- Broadcast corrections -->
-      <div class="card corrections-card">
-        <div class="corrections-header">
-          <h2>Corrections Needed</h2>
-          <span class="corrections-sub">Exact adjustments to reach broadcast standard (−14 LUFS target)</span>
-        </div>
-        <div id="corrections-list" class="corrections-list">
-          <div class="corr-placeholder">Collecting data — corrections appear after a few seconds of analysis.</div>
+          <div class="target-row">
+            <span class="target-name">Content type</span>
+            <span class="target-ref" id="plat-content-ref">Gaming + Commentary · −18 LUFS</span>
+            <span class="target-status" id="plat-content-status"><span class="status-badge neutral">—</span></span>
+          </div>
+          <div class="target-row">
+            <span class="target-name">Twitch</span>
+            <span class="target-ref">Max −14 LUFS</span>
+            <span class="target-status" id="plat-twitch-status"><span class="status-badge neutral">—</span></span>
+          </div>
+          <div class="target-row">
+            <span class="target-name">YouTube</span>
+            <span class="target-ref">Normalizes to −14 LUFS</span>
+            <span class="target-status" id="plat-youtube-status"><span class="status-badge neutral">—</span></span>
+          </div>
+          <div class="target-row">
+            <span class="target-name">Discord</span>
+            <span class="target-ref">Voice clarity around −16 LUFS</span>
+            <span class="target-status" id="plat-discord-status"><span class="status-badge neutral">—</span></span>
+          </div>
+          <div class="target-row">
+            <span class="target-name">Broadcast</span>
+            <span class="target-ref">EBU R128 · −23 LUFS</span>
+            <span class="target-status" id="plat-broadcast-status"><span class="status-badge neutral">—</span></span>
+          </div>
         </div>
       </div>
 

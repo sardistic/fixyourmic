@@ -87,6 +87,22 @@ class StreamVisualizer {
 
     ctx.clearRect(0, 0, W, H);
 
+    // Subtle frequency regions so the band legend maps to the plot.
+    const bandRegions = [
+      { from: 20,   to: 60,    color: 'rgba(124,58,237,0.08)' },
+      { from: 60,   to: 250,   color: 'rgba(59,130,246,0.075)' },
+      { from: 250,  to: 800,   color: 'rgba(6,182,212,0.07)' },
+      { from: 800,  to: 3000,  color: 'rgba(34,197,94,0.065)' },
+      { from: 3000, to: 8000,  color: 'rgba(245,158,11,0.07)' },
+      { from: 8000, to: 20000, color: 'rgba(236,72,153,0.07)' },
+    ];
+    for (const band of bandRegions) {
+      const x1 = this._freqToX(band.from, nyquist, bins, W);
+      const x2 = this._freqToX(Math.min(band.to, nyquist), nyquist, bins, W);
+      ctx.fillStyle = band.color;
+      ctx.fillRect(x1, 0, Math.max(0, x2 - x1), H);
+    }
+
     // Background grid
     ctx.strokeStyle = 'rgba(255,255,255,0.04)';
     ctx.lineWidth = 1;
