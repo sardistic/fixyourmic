@@ -711,10 +711,18 @@ input[type="text"].full-width:focus { border-color: var(--accent); }
 }
 
 /* Frequency bands */
-.band-chart { display: flex; gap: 8px; height: 130px; align-items: flex-end; margin-top: 4px; }
-.band-item { display: flex; flex-direction: column; align-items: center; flex: 1; gap: 4px; height: 100%; }
-.band-bar-wrap {
+.band-chart { display: flex; gap: 8px; align-items: flex-start; margin-top: 4px; }
+.band-item {
+  display: grid;
+  grid-template-rows: 90px 28px 14px;
+  align-items: end;
+  justify-items: center;
   flex: 1;
+  gap: 4px;
+  min-width: 0;
+}
+.band-bar-wrap {
+  height: 90px;
   width: 100%;
   background: var(--bg);
   border-radius: 4px 4px 0 0;
@@ -737,7 +745,7 @@ input[type="text"].full-width:focus { border-color: var(--accent); }
 .band-fill.mid     { background: var(--mid-color); }
 .band-fill.presence{ background: var(--pres-color); }
 .band-fill.air     { background: var(--air-color); }
-.band-name { font-size: 0.62rem; text-align: center; color: var(--text-muted); line-height: 1.2; }
+.band-name { font-size: 0.62rem; text-align: center; color: var(--text-muted); line-height: 1.2; white-space: nowrap; }
 .band-name small { font-size: 0.58rem; }
 .band-db { font-size: 0.65rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
