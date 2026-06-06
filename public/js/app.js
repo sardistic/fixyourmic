@@ -194,7 +194,7 @@ function loadHls(url, label) {
         currentStreamLabel = label;
         setStatus('live', `Live: ${label}`);
         await initAudioAnalysis();
-      }).catch(err => setStatus('error', `Playback error: ${err.message}`));
+      }).catch(err => handlePlaybackError(err));
     });
 
     hls.on(Hls.Events.ERROR, (_, data) => {
@@ -209,8 +209,16 @@ function loadHls(url, label) {
     video.play().then(async () => {
       setStatus('live', label);
       await initAudioAnalysis();
-    }).catch(err => setStatus('error', err.message));
+    }).catch(err => handlePlaybackError(err));
   }
+}
+
+function handlePlaybackError(err) {
+  if (err?.name === 'NotAllowedError' || /user didn't interact|user gesture|not allowed/i.test(err?.message || '')) {
+    setStatus('error', 'Playback was blocked by the browser. Click Analyze again to start the stream.');
+    return;
+  }
+  setStatus('error', `Playback error: ${err?.message || 'Unable to start playback.'}`);
 }
 
 // ── Audio analysis setup (from video element) ────────────────────────────────
@@ -624,7 +632,7 @@ function startAnalysisFromRoute() {
   if (!channel) return;
   const input = document.getElementById('stream-url-input');
   input.value = channel;
-  resolveAndLoad(`https://www.twitch.tv/${channel}`);
+  input.setAttribute('aria-label', `Analyze twitch.tv/${channel}`);
 }
 
 startAnalysisFromRoute();
