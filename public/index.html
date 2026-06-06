@@ -6,7 +6,7 @@
   <title>Fix Your Mic — Broadcast Audio Analysis for Streamers</title>
   <meta name="description" content="Paste any live Twitch channel and get broadcast-grade audio analysis — LUFS, peaks, dynamic range, frequency balance, and exact corrections.">
   <meta name="theme-color" content="#13131c">
-  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/png" sizes="512x512" href="favicon.png">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
   <link rel="shortcut icon" href="favicon.ico">
@@ -24,46 +24,15 @@
 </head>
 <body>
 
-  <header class="site-header">
-    <div class="site-header-inner">
-      <div class="logo">
-        <svg width="30" height="30" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect width="32" height="32" rx="7.5" fill="#13131c"/>
-          <defs><clipPath id="lc"><rect x="12" y="5.5" width="8" height="14.5" rx="4"/></clipPath></defs>
-          <g clip-path="url(#lc)">
-            <rect x="12" y="5.5"  width="8" height="8"   fill="#22c55e"/>
-            <rect x="12" y="13.5" width="8" height="3.6" fill="#f59e0b"/>
-            <rect x="12" y="17.1" width="8" height="2.9" fill="#ef4444"/>
-          </g>
-          <g stroke="#13131c" stroke-width="0.5">
-            <line x1="12.3" y1="9"    x2="19.7" y2="9"/>
-            <line x1="12.3" y1="11.5" x2="19.7" y2="11.5"/>
-            <line x1="12.3" y1="15"   x2="19.7" y2="15"/>
-          </g>
-          <path d="M9.4 16.4a6.6 6.6 0 0 0 13.2 0" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/>
-          <rect x="15.2" y="22" width="1.6" height="3.6" rx="0.8" fill="#fff"/>
-          <rect x="12.4" y="24.8" width="7.2" height="1.6" rx="0.8" fill="#fff"/>
-        </svg>
-        <span>Fix Your Mic</span>
-      </div>
-      <nav class="site-nav">
-        <a href="https://github.com/sardistic/fixyourmic" target="_blank" rel="noopener" class="nav-link">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
-          GitHub
-        </a>
-      </nav>
-    </div>
-  </header>
-
   <main>
 
     <!-- Landing page — shown when idle -->
     <section class="landing" id="landing">
 
       <div class="hero">
-        <div class="hero-badge">Free &amp; Open Source</div>
-        <h1 class="hero-title">Does your stream<br>actually sound good?</h1>
-        <p class="hero-sub">Paste any live Twitch channel and get broadcast-grade audio analysis in seconds — LUFS, peaks, dynamic range, frequency balance, and exact corrections.</p>
+        <div class="hero-badge">Twitch audio analyzer</div>
+        <h1 class="hero-title">Check a live stream’s audio.</h1>
+        <p class="hero-sub">Paste a Twitch channel to measure LUFS, peaks, dynamic range, frequency balance, and the fixes that would make it easier to listen to.</p>
 
         <div class="input-card">
           <div class="input-card-row">
@@ -566,6 +535,12 @@
 
     </div>
   </main>
+
+  <footer class="site-footer">
+    <span class="footer-credit">by <img src="liquid_transparent.gif" alt="" class="footer-liquid"> <a href="https://sardistic.com" target="_blank" rel="noopener">sardistic.com</a></span>
+    <span class="footer-sep">/</span>
+    <a href="https://github.com/sardistic/fixyourmic" target="_blank" rel="noopener">GitHub</a>
+  </footer>
 
   <!-- Post-analysis report — shown when session is stopped -->
   <div id="report" class="report hidden"></div>
