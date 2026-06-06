@@ -169,6 +169,16 @@ function resolveUrl(url, base) {
   try { return new URL(url, base).toString(); } catch { return url; }
 }
 
+// Shareable channel routes, e.g. /cyr -> same app shell, frontend starts twitch.tv/cyr.
+// Keep this after API/proxy/static routes so it only catches channel-like slugs.
+app.get(/^\/([A-Za-z0-9_]{1,25})\/+$/, (req, res) => {
+  res.redirect(301, `/${req.params[0]}`);
+});
+
+app.get(/^\/([A-Za-z0-9_]{1,25})$/, (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 app.listen(PORT, () => {
   console.log(`Stream Audio Analyzer → http://localhost:${PORT}`);
 });

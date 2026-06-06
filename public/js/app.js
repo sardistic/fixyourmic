@@ -80,6 +80,27 @@ function parseChannelInput(raw) {
   return s.replace(/[^a-z0-9_]/gi, '').toLowerCase().slice(0, 25);
 }
 
+function getChannelFromPath() {
+  let slug = window.location.pathname.replace(/^\/+|\/+$/g, '');
+  try { slug = decodeURIComponent(slug); } catch { return ''; }
+  if (!slug || slug.includes('/') || slug.includes('.')) return '';
+  return parseChannelInput(slug);
+}
+
+function setAnalysisRoute(channel) {
+  if (!channel || !window.history?.pushState) return;
+  const nextPath = `/${encodeURIComponent(channel)}`;
+  if (window.location.pathname !== nextPath) {
+    window.history.pushState({}, '', `${nextPath}${window.location.search || ''}`);
+  }
+}
+
+function resetAnalysisRoute() {
+  if (window.history?.pushState && window.location.pathname !== '/') {
+    window.history.pushState({}, '', `/${window.location.search || ''}`);
+  }
+}
+
 let hls = null;
 let audioCtx = null;
 let analyzer = null;
@@ -106,10 +127,8 @@ document.getElementById('analyze-stream').addEventListener('click', () => {
   const raw = document.getElementById('stream-url-input').value;
   const channel = parseChannelInput(raw);
   if (!channel) return;
+  setAnalysisRoute(channel);
   resolveAndLoad(`https://www.twitch.tv/${channel}`);
-});
-document.getElementById('stream-url-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('analyze-stream').click();
 });
 document.getElementById('stream-url-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('analyze-stream').click();
@@ -597,7 +616,18 @@ function startNewAnalysis() {
   lastRecs = [];
   currentStreamLabel = '';
   analysisStartTime = null;
+  resetAnalysisRoute();
 }
+
+function startAnalysisFromRoute() {
+  const channel = getChannelFromPath();
+  if (!channel) return;
+  const input = document.getElementById('stream-url-input');
+  input.value = channel;
+  resolveAndLoad(`https://www.twitch.tv/${channel}`);
+}
+
+startAnalysisFromRoute();
 
 // ── Volume / mute controls ────────────────────────────────────────────────────
 const volumeSlider = document.getElementById('volume-slider');
