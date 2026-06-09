@@ -112,6 +112,8 @@ let visualizer = null;
 let animFrame = null;
 let running = false;
 let analysisStartTime = null;
+let transcriptSessionId = null;
+let transcriptPollInterval = null;
 
 // ── Tabs ────────────────────────────────────────────────────────────────────
 document.querySelectorAll('.tab').forEach(tab => {
@@ -202,6 +204,7 @@ function loadHls(url, label) {
       video.play().then(async () => {
         currentStreamLabel = label;
         setStatus('live', `Live: ${label}`);
+        startLiveTranscript(label);
         await initAudioAnalysis();
       }).catch(err => handlePlaybackError(err));
     });
@@ -217,6 +220,7 @@ function loadHls(url, label) {
     video.src = url;
     video.play().then(async () => {
       setStatus('live', label);
+      startLiveTranscript(label);
       await initAudioAnalysis();
     }).catch(err => handlePlaybackError(err));
   }
@@ -547,6 +551,124 @@ function avg(values) {
   return finite.length ? finite.reduce((sum, v) => sum + v, 0) / finite.length : NaN;
 }
 
+async function startLiveTranscript(streamUrl) {
+  stopLiveTranscript();
+  setTranscriptState('starting', 'Starting live transcript…');
+  try {
+    const res = await fetch('/api/transcript/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: streamUrl }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      setTranscriptState('unavailable', data.error || 'Live transcript unavailable.');
+      return;
+    }
+    transcriptSessionId = data.id;
+    transcriptPollInterval = setInterval(pollLiveTranscript, 4000);
+    pollLiveTranscript();
+  } catch (err) {
+    setTranscriptState('unavailable', `Transcript error: ${err.message}`);
+  }
+}
+
+async function pollLiveTranscript() {
+  if (!transcriptSessionId) return;
+  try {
+    const res = await fetch(`/api/transcript/${encodeURIComponent(transcriptSessionId)}`);
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      setTranscriptState('unavailable', data.error || 'Transcript session unavailable.');
+      return;
+    }
+    renderLiveTranscript(data);
+  } catch (err) {
+    setTranscriptState('unavailable', `Transcript polling error: ${err.message}`);
+  }
+}
+
+function stopLiveTranscript() {
+  if (transcriptPollInterval) {
+    clearInterval(transcriptPollInterval);
+    transcriptPollInterval = null;
+  }
+  if (transcriptSessionId) {
+    fetch(`/api/transcript/${encodeURIComponent(transcriptSessionId)}/stop`, { method: 'POST' }).catch(() => {});
+    transcriptSessionId = null;
+  }
+}
+
+function renderLiveTranscript(data) {
+  const segments = data.segments || [];
+  const status = data.lastError ? `Transcript issue: ${data.lastError}` : transcriptStatusLabel(data.status);
+  setText('transcript-status', status);
+
+  const list = document.getElementById('transcript-list');
+  const summary = document.getElementById('transcript-summary');
+  if (!list || !summary) return;
+
+  if (!segments.length) {
+    list.innerHTML = '<div class="transcript-empty">Listening for speech…</div>';
+    summary.innerHTML = '<span class="transcript-pill neutral">Listening</span><span>Speech clarity will update after the first transcript chunk.</span>';
+    return;
+  }
+
+  const latest = segments[segments.length - 1];
+  const recentText = segments.slice(-4).map(s => s.text).join(' ');
+  const wordCount = recentText.split(/\s+/).filter(Boolean).length;
+  const clarity = latest.confidence || 'medium';
+  summary.innerHTML = `
+    <span class="transcript-pill ${clarity}">${clarityLabel(clarity)}</span>
+    <span>${wordCount} recent words captured</span>
+  `;
+  list.innerHTML = segments.slice(-8).reverse().map(seg => `
+    <div class="transcript-segment">
+      <span class="transcript-time">${fmtClock(seg.t)}</span>
+      <span class="transcript-text">${escapeHtml(seg.text)}</span>
+    </div>
+  `).join('');
+}
+
+function setTranscriptState(kind, text) {
+  setText('transcript-status', text);
+  const summary = document.getElementById('transcript-summary');
+  const list = document.getElementById('transcript-list');
+  if (summary) {
+    summary.innerHTML = `<span class="transcript-pill ${kind === 'unavailable' ? 'bad' : 'neutral'}">${kind}</span><span>${escapeHtml(text)}</span>`;
+  }
+  if (list && kind === 'unavailable') {
+    list.innerHTML = '<div class="transcript-empty">Set OPENAI_API_KEY on the server to enable live transcription.</div>';
+  }
+}
+
+function transcriptStatusLabel(status) {
+  if (status === 'resolving') return 'Resolving audio…';
+  if (status === 'transcribing') return 'Transcribing latest chunk…';
+  if (status === 'listening') return 'Listening live…';
+  if (status === 'starting') return 'Starting…';
+  return status || 'Transcript idle';
+}
+
+function clarityLabel(confidence) {
+  if (confidence === 'high') return 'Clear speech';
+  if (confidence === 'medium') return 'Some speech';
+  return 'Low speech signal';
+}
+
+function fmtClock(ts) {
+  return new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 // ── Recommendations engine ────────────────────────────────────────────────────
 function buildRecs(m) {
   const recs = [];
@@ -676,6 +798,7 @@ function stopAnalysis(options = {}) {
   if (animFrame) cancelAnimationFrame(animFrame);
   if (recInterval) { clearInterval(recInterval); recInterval = null; }
   if (histInterval) { clearInterval(histInterval); histInterval = null; }
+  stopLiveTranscript();
   if (hls) { hls.destroy(); hls = null; }
   video.pause();
   video.src = '';

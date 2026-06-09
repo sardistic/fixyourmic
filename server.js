@@ -1,12 +1,16 @@
 const express = require('express');
 const fetch = require('node-fetch');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
+const crypto = require('crypto');
 const { execFile, execSync } = require('child_process');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json({ limit: '32kb' }));
 
 // Resolve streamlink binary path once at startup — handles cases where the
 // system PATH seen by Node.js differs from the shell PATH (common on Windows).
@@ -148,6 +152,165 @@ app.get('/proxy', async (req, res) => {
     res.status(502).send(`Proxy error: ${err.message}`);
   }
 });
+
+const transcriptSessions = new Map();
+
+app.post('/api/transcript/start', (req, res) => {
+  const streamUrl = req.body?.url?.trim();
+  if (!streamUrl) return res.status(400).json({ error: 'URL required' });
+  if (!/^https?:\/\/(www\.)?twitch\.tv\/[a-zA-Z0-9_]{1,25}/.test(streamUrl)) {
+    return res.status(400).json({ error: 'Enter a Twitch channel URL.' });
+  }
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(503).json({ error: 'Live transcript needs OPENAI_API_KEY on the server.' });
+  }
+
+  const id = crypto.randomUUID();
+  const session = {
+    id,
+    streamUrl,
+    startedAt: Date.now(),
+    status: 'starting',
+    running: true,
+    segments: [],
+    lastError: null,
+    chunkIndex: 0,
+  };
+  transcriptSessions.set(id, session);
+  runTranscriptSession(session).catch(err => {
+    session.status = 'error';
+    session.lastError = err.message;
+    session.running = false;
+  });
+  res.json({ id, status: session.status });
+});
+
+app.get('/api/transcript/:id', (req, res) => {
+  const session = transcriptSessions.get(req.params.id);
+  if (!session) return res.status(404).json({ error: 'Transcript session not found.' });
+  res.json({
+    id: session.id,
+    status: session.status,
+    startedAt: session.startedAt,
+    lastError: session.lastError,
+    segments: session.segments.slice(-12),
+  });
+});
+
+app.post('/api/transcript/:id/stop', (req, res) => {
+  const session = transcriptSessions.get(req.params.id);
+  if (!session) return res.json({ ok: true });
+  session.running = false;
+  session.status = 'stopped';
+  setTimeout(() => transcriptSessions.delete(req.params.id), 30000);
+  res.json({ ok: true });
+});
+
+async function runTranscriptSession(session) {
+  session.status = 'resolving';
+  const hlsUrl = await resolveStreamUrl(session.streamUrl);
+  while (session.running) {
+    session.status = 'listening';
+    const chunkPath = path.join(os.tmpdir(), `fixyourmic-${session.id}-${session.chunkIndex++}.mp3`);
+    try {
+      await captureAudioChunk(hlsUrl, chunkPath);
+      session.status = 'transcribing';
+      const text = await transcribeAudioFile(chunkPath);
+      if (text) {
+        session.segments.push({
+          id: crypto.randomUUID(),
+          t: Date.now(),
+          text,
+          confidence: estimateTranscriptConfidence(text),
+        });
+        if (session.segments.length > 80) session.segments.splice(0, session.segments.length - 80);
+      }
+      session.status = 'listening';
+    } catch (err) {
+      session.lastError = err.message;
+      session.status = 'error';
+      await sleep(4000);
+    } finally {
+      fs.promises.unlink(chunkPath).catch(() => {});
+    }
+    await sleep(2500);
+  }
+}
+
+function resolveStreamUrl(streamUrl) {
+  return new Promise((resolve, reject) => {
+    execFile(
+      STREAMLINK_BIN,
+      ['--stream-url', streamUrl, 'audio_only,160p,360p,worst'],
+      { timeout: 25000 },
+      (err, stdout, stderr) => {
+        const output = stdout?.trim();
+        if (err || !output) {
+          const msg = (output || stderr || err?.message || '').trim();
+          reject(new Error(msg.slice(0, 200) || 'Unable to resolve stream audio.'));
+          return;
+        }
+        resolve(output.split('\n')[0]);
+      }
+    );
+  });
+}
+
+function captureAudioChunk(hlsUrl, outPath) {
+  return new Promise((resolve, reject) => {
+    execFile(
+      'ffmpeg',
+      ['-hide_banner', '-loglevel', 'error', '-y', '-i', hlsUrl, '-t', '8', '-vn', '-ac', '1', '-ar', '16000', '-b:a', '48k', outPath],
+      { timeout: 18000 },
+      (err, stdout, stderr) => {
+        if (err) {
+          reject(new Error((stderr || err.message || 'ffmpeg failed').trim().slice(0, 200)));
+          return;
+        }
+        resolve();
+      }
+    );
+  });
+}
+
+async function transcribeAudioFile(filePath) {
+  const boundary = `----fixyourmic-${crypto.randomBytes(12).toString('hex')}`;
+  const audio = await fs.promises.readFile(filePath);
+  const body = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\ngpt-4o-mini-transcribe\r\n`),
+    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="response_format"\r\n\r\njson\r\n`),
+    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="chunk.mp3"\r\nContent-Type: audio/mpeg\r\n\r\n`),
+    audio,
+    Buffer.from(`\r\n--${boundary}--\r\n`),
+  ]);
+
+  const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      'Content-Type': `multipart/form-data; boundary=${boundary}`,
+      'Content-Length': String(body.length),
+    },
+    body,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error?.message || `transcription failed (${response.status})`);
+  }
+  return (data.text || '').trim();
+}
+
+function estimateTranscriptConfidence(text) {
+  if (!text) return 'low';
+  const words = text.split(/\s+/).filter(Boolean).length;
+  if (words >= 12) return 'high';
+  if (words >= 5) return 'medium';
+  return 'low';
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 function rewriteM3u8(content, baseUrl) {
   return content.split('\n').map(line => {

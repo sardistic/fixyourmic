@@ -904,6 +904,81 @@ input[type="text"].full-width:focus { border-color: var(--accent); }
   justify-self: end;
 }
 
+.transcript-card .card-header {
+  margin-bottom: 12px;
+}
+.transcript-status {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+.transcript-summary {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding: 9px 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+.transcript-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border2);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.transcript-pill.high { color: var(--green); border-color: rgba(34,197,94,0.35); background: rgba(34,197,94,0.10); }
+.transcript-pill.medium { color: var(--yellow); border-color: rgba(245,158,11,0.35); background: rgba(245,158,11,0.10); }
+.transcript-pill.low,
+.transcript-pill.bad { color: var(--red); border-color: rgba(239,68,68,0.35); background: rgba(239,68,68,0.10); }
+.transcript-pill.neutral,
+.transcript-pill.starting { color: var(--cyan); border-color: rgba(6,182,212,0.28); background: rgba(6,182,212,0.08); }
+.transcript-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-height: 220px;
+  overflow: auto;
+}
+.transcript-segment {
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  gap: 10px;
+  padding: 9px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+.transcript-time {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+.transcript-text {
+  color: var(--text);
+}
+.transcript-empty {
+  padding: 14px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  text-align: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
 /* Recommendations */
 .recs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-top: 4px; }
 .rec-loading { color: var(--text-muted); font-size: 0.85rem; padding: 12px; }
