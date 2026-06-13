@@ -1320,6 +1320,57 @@ td.seg-info { color: var(--cyan); font-weight: 600; }
 .rep-rec.bad  strong { color: var(--red); }
 .rep-rec.info strong { color: var(--cyan); }
 
+.rep-transcript-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 10px;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+}
+.rep-transcript-list {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.rep-transcript-row {
+  display: grid;
+  grid-template-columns: 92px 118px minmax(0, 1fr);
+  gap: 10px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+.rep-transcript-row:last-child { border-bottom: none; }
+.rep-transcript-time {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.rep-transcript-confidence {
+  color: var(--cyan);
+  font-weight: 600;
+}
+.rep-transcript-text {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.rep-transcript-empty {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 640px) {
+  .rep-transcript-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+
 /* ── Print / PDF export ── */
 @media print {
   @page { size: A4; margin: 15mm 18mm; }
@@ -1358,6 +1409,14 @@ td.seg-info { color: var(--cyan); font-weight: 600; }
   .rep-rec.good strong { color: #166534; }
   .rep-rec.warn strong { color: #92400e; }
   .rep-rec.bad  strong { color: #991b1b; }
+
+  .rep-transcript-meta { color: #555; }
+  .rep-transcript-list,
+  .rep-transcript-empty { border: 1px solid #ddd; color: #555; }
+  .rep-transcript-row { border-bottom: 1px solid #eee; }
+  .rep-transcript-time { color: #666; }
+  .rep-transcript-confidence { color: #1e40af; }
+  .rep-transcript-text { color: #111; }
 
   .rep-section { page-break-inside: avoid; margin-bottom: 20px; }
   .rep-table { page-break-inside: auto; }

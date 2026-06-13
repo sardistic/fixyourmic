@@ -114,6 +114,8 @@ let running = false;
 let analysisStartTime = null;
 let transcriptSessionId = null;
 let transcriptPollInterval = null;
+let transcriptSegments = [];
+let transcriptExportStatus = 'Transcript idle';
 
 // ── Tabs ────────────────────────────────────────────────────────────────────
 document.querySelectorAll('.tab').forEach(tab => {
@@ -553,6 +555,8 @@ function avg(values) {
 
 async function startLiveTranscript(streamUrl) {
   stopLiveTranscript();
+  transcriptSegments = [];
+  transcriptExportStatus = 'Starting live transcript...';
   setTranscriptState('starting', 'Starting live transcript…');
   try {
     const res = await fetch('/api/transcript/start', {
@@ -602,6 +606,8 @@ function stopLiveTranscript() {
 function renderLiveTranscript(data) {
   const segments = data.segments || [];
   const status = data.lastError ? `Transcript issue: ${data.lastError}` : transcriptStatusLabel(data.status);
+  transcriptSegments = segments.map(seg => ({ ...seg }));
+  transcriptExportStatus = status;
   setText('transcript-status', status);
 
   const list = document.getElementById('transcript-list');
@@ -631,6 +637,7 @@ function renderLiveTranscript(data) {
 }
 
 function setTranscriptState(kind, text) {
+  transcriptExportStatus = text;
   setText('transcript-status', text);
   const summary = document.getElementById('transcript-summary');
   const list = document.getElementById('transcript-list');
@@ -654,6 +661,32 @@ function clarityLabel(confidence) {
   if (confidence === 'high') return 'Clear speech';
   if (confidence === 'medium') return 'Some speech';
   return 'Low speech signal';
+}
+
+function buildTranscriptReportHTML(segments, status) {
+  if (!segments.length) {
+    return `
+      <div class="rep-transcript-empty">
+        ${escapeHtml(status || 'No speech captured during this analysis.')}
+      </div>
+    `;
+  }
+
+  return `
+    <div class="rep-transcript-meta">
+      <span>${segments.length} transcript segment${segments.length === 1 ? '' : 's'}</span>
+      <span>${escapeHtml(status || 'Transcript captured')}</span>
+    </div>
+    <div class="rep-transcript-list">
+      ${segments.map(seg => `
+        <div class="rep-transcript-row">
+          <span class="rep-transcript-time">${fmtClock(seg.t)}</span>
+          <span class="rep-transcript-confidence">${escapeHtml(clarityLabel(seg.confidence || 'medium'))}</span>
+          <span class="rep-transcript-text">${escapeHtml(seg.text || '')}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
 }
 
 function fmtClock(ts) {
@@ -791,6 +824,8 @@ function stopAnalysis(options = {}) {
       startTime: analysisStartTime,
       targetLufs: TARGET_LUFS,
       contentType: document.getElementById('target-preset').selectedOptions[0]?.text.split('(')[0].trim() || 'Streaming',
+      transcriptSegments: transcriptSegments.map(seg => ({ ...seg })),
+      transcriptStatus: transcriptExportStatus,
     };
   }
 
@@ -831,6 +866,8 @@ function startNewAnalysis() {
   history.length = 0;
   lastMetrics = null;
   lastRecs = [];
+  transcriptSegments = [];
+  transcriptExportStatus = 'Transcript idle';
   currentStreamLabel = '';
   analysisStartTime = null;
   resetAnalysisRoute();
@@ -1116,7 +1153,18 @@ function fmtTime(seconds) {
 
 // ── Report generation ─────────────────────────────────────────────────────────
 function showReport(snap) {
-  const { histImg, history: hist, metrics: m, recs, label, date, targetLufs = -18, contentType = 'Streaming' } = snap;
+  const {
+    histImg,
+    history: hist,
+    metrics: m,
+    recs,
+    label,
+    date,
+    targetLufs = -18,
+    contentType = 'Streaming',
+    transcriptSegments: reportTranscriptSegments = [],
+    transcriptStatus = 'Transcript idle',
+  } = snap;
   const snapTarget = targetLufs;
   const duration = hist.length > 1 ? (hist[hist.length - 1].t - hist[0].t) / 1000 : 0;
 
@@ -1183,6 +1231,7 @@ function showReport(snap) {
   const recHTML = recs.length
     ? recs.map(r => `<div class="rep-rec ${r.type}"><strong>${r.title}</strong><br>${r.body}</div>`).join('')
     : '<div class="rep-rec info">Not enough data collected for recommendations.</div>';
+  const transcriptHTML = buildTranscriptReportHTML(reportTranscriptSegments, transcriptStatus);
 
   const el = document.getElementById('report');
   el.innerHTML = `
@@ -1288,6 +1337,11 @@ function showReport(snap) {
     <div class="rep-section">
       <div class="rep-section-title">Recommendations</div>
       <div class="rep-recs">${recHTML}</div>
+    </div>
+
+    <div class="rep-section">
+      <div class="rep-section-title">Transcript</div>
+      ${transcriptHTML}
     </div>
   `;
 
