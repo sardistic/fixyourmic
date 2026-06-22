@@ -25,19 +25,29 @@
 }
 
 html { font-size: 14px; }
-/* Subtle animated dotted/diagonal backdrop (dark base, light shapes) */
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
   color: var(--text);
   min-height: 100vh;
-  background-color: #000;
+  position: relative;
+  isolation: isolate;
+}
+/* Subtle animated dotted/diagonal backdrop (dark base, light shapes) */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.12;
   background-image:
-    radial-gradient(rgba(221,225,240,0.10) 17%, transparent 18% 35%, transparent 36.5%),
-    radial-gradient(rgba(221,225,240,0.10) 17%, transparent 18% 35%, transparent 36.5%),
-    radial-gradient(transparent 34%, rgba(221,225,240,0.08) 36% 68%, transparent 70%),
-    repeating-linear-gradient(45deg, rgba(221,225,240,0.06) -12.5% 12.5%, transparent 0 37.5%);
+    radial-gradient(var(--text) 17%, transparent 18% 35%, transparent 36.5%),
+    radial-gradient(var(--text) 17%, transparent 18% 35%, transparent 36.5%),
+    radial-gradient(transparent 34%, var(--text) 36% 68%, transparent 70%),
+    repeating-linear-gradient(45deg, var(--text) -12.5% 12.5%, transparent 0 37.5%);
+  background-position: -34px -34px, 34px 34px, 0 0, 0 0;
   background-size: 136px 136px, 136px 136px, 68px 68px, 136px 136px;
-  background-attachment: fixed;
   animation: bgDrift 40s linear infinite;
 }
 @keyframes bgDrift {
@@ -45,7 +55,7 @@ body {
   to   { background-position: 102px 102px, 170px 170px, 136px 136px, 136px 136px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  body { animation: none; background-position: -34px -34px, 34px 34px, 0 0, 0 0; }
+  body::before { animation: none; }
 }
 .hidden { display: none !important; }
 
