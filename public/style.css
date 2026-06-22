@@ -40,7 +40,7 @@ body::before {
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  opacity: 0.03;
+  opacity: 0.02;
   background-image:
     radial-gradient(var(--text) 17%, transparent 18% 35%, transparent 36.5%),
     radial-gradient(var(--text) 17%, transparent 18% 35%, transparent 36.5%),
