@@ -41,12 +41,12 @@ body::before {
   z-index: -1;
   pointer-events: none;
   opacity: 0.05;
-  background-color: var(--bg);
+  background-color: #000;
   background-image:
-    radial-gradient(var(--accent) 17%, transparent 18% 35%, transparent 36.5%),
-    radial-gradient(var(--accent) 17%, transparent 18% 35%, transparent 36.5%),
-    radial-gradient(transparent 34%, var(--accent) 36% 68%, transparent 70%),
-    repeating-linear-gradient(45deg, var(--accent) -12.5% 12.5%, transparent 0 37.5%);
+    radial-gradient(var(--text) 17%, transparent 18% 35%, transparent 36.5%),
+    radial-gradient(var(--text) 17%, transparent 18% 35%, transparent 36.5%),
+    radial-gradient(transparent 34%, var(--text) 36% 68%, transparent 70%),
+    repeating-linear-gradient(45deg, var(--text) -12.5% 12.5%, transparent 0 37.5%);
   background-position: -34px -34px, 34px 34px, 0 0, 0 0;
   background-size: 136px 136px, 136px 136px, 68px 68px, 136px 136px;
   animation: bgDrift 40s linear infinite;
