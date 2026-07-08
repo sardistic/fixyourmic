@@ -59,6 +59,7 @@ function formatViewers(n) {
   return `${n}`;
 }
 loadTopStreams();
+if (window.HardwareAdvice) window.HardwareAdvice.initHardwareSelectors();
 
 // Robust Twitch channel name extractor — handles any URL format the user might paste
 function parseChannelInput(raw) {
@@ -710,25 +711,25 @@ function buildRecs(m) {
   if (isFinite(m.lufsIntegrated)) {
     const lufs = m.lufsIntegrated;
     if (lufs > -9) {
-      recs.push({ type: 'bad', title: 'Audio is too loud', body: `At ${fmt(lufs, 1)} LUFS, platforms will aggressively reduce your stream. Target around −14 LUFS.` });
+      recs.push({ issue: 'loud', type: 'bad', title: 'Audio is too loud', body: `At ${fmt(lufs, 1)} LUFS, platforms will aggressively reduce your stream. Target around −14 LUFS.` });
     } else if (lufs > TARGET_LUFS) {
-      recs.push({ type: 'warn', title: 'Slightly above target', body: `${fmt(lufs, 1)} LUFS is ${fmt(lufs - TARGET_LUFS, 1)} LU above your content-type target. Reduce output by ~${fmt(lufs - TARGET_LUFS, 1)} LU.` });
+      recs.push({ issue: 'loud', type: 'warn', title: 'Slightly above target', body: `${fmt(lufs, 1)} LUFS is ${fmt(lufs - TARGET_LUFS, 1)} LU above your content-type target. Reduce output by ~${fmt(lufs - TARGET_LUFS, 1)} LU.` });
     } else if (lufs >= -18) {
       recs.push({ type: 'good', title: 'Loudness on target', body: `${fmt(lufs, 1)} LUFS sits well within the −14 LUFS streaming sweet spot.` });
     } else if (lufs >= -23) {
-      recs.push({ type: 'warn', title: 'Slightly quiet', body: `${fmt(lufs, 1)} LUFS is below typical streaming levels. Viewers may need to turn up their volume.` });
+      recs.push({ issue: 'quiet', type: 'warn', title: 'Slightly quiet', body: `${fmt(lufs, 1)} LUFS is below typical streaming levels. Viewers may need to turn up their volume.` });
     } else {
-      recs.push({ type: 'bad', title: 'Audio is too quiet', body: `${fmt(lufs, 1)} LUFS is very quiet. Most viewers will struggle without boosting their system volume significantly.` });
+      recs.push({ issue: 'quiet', type: 'bad', title: 'Audio is too quiet', body: `${fmt(lufs, 1)} LUFS is very quiet. Most viewers will struggle without boosting their system volume significantly.` });
     }
   }
 
   // Clipping
   if (m.clipCount > 10) {
-    recs.push({ type: 'bad', title: 'Clipping detected', body: `${m.clipCount} clipping events recorded. Viewers hear this as harsh digital distortion. Reduce your output gain or add a limiter.` });
+    recs.push({ issue: 'clip', type: 'bad', title: 'Clipping detected', body: `${m.clipCount} clipping events recorded. Viewers hear this as harsh digital distortion. Reduce your output gain or add a limiter.` });
   } else if (m.clipCount > 0) {
-    recs.push({ type: 'warn', title: 'Minor clipping', body: `${m.clipCount} brief clip${m.clipCount > 1 ? 's' : ''} detected. Watch your peak levels — keep peak dBFS below −1 dBFS.` });
+    recs.push({ issue: 'clip', type: 'warn', title: 'Minor clipping', body: `${m.clipCount} brief clip${m.clipCount > 1 ? 's' : ''} detected. Watch your peak levels — keep peak dBFS below −1 dBFS.` });
   } else if (isFinite(m.peakHoldDB) && m.peakHoldDB > -1) {
-    recs.push({ type: 'warn', title: 'Peaks near 0 dBFS', body: `Peak at ${fmt(m.peakHoldDB, 1)} dBFS is very close to clipping. Any sudden loud moment will distort.` });
+    recs.push({ issue: 'peak', type: 'warn', title: 'Peaks near 0 dBFS', body: `Peak at ${fmt(m.peakHoldDB, 1)} dBFS is very close to clipping. Any sudden loud moment will distort.` });
   } else if (isFinite(m.peakHoldDB) && m.peakHoldDB <= -1) {
     recs.push({ type: 'good', title: 'Peaks look clean', body: `Peak at ${fmt(m.peakHoldDB, 1)} dBFS — safe headroom, no clipping risk detected.` });
   }
@@ -736,13 +737,13 @@ function buildRecs(m) {
   // Dynamic range
   if (m.lra > 0) {
     if (m.lra < 3) {
-      recs.push({ type: 'warn', title: 'Very compressed', body: `Loudness range of ${fmt(m.lra, 1)} LU is extremely narrow. Heavy compression can cause listener fatigue over long streams.` });
+      recs.push({ issue: 'dyn-narrow', type: 'warn', title: 'Very compressed', body: `Loudness range of ${fmt(m.lra, 1)} LU is extremely narrow. Heavy compression can cause listener fatigue over long streams.` });
     } else if (m.lra < 6) {
       recs.push({ type: 'info', title: 'Moderate compression', body: `${fmt(m.lra, 1)} LU range is typical for streaming. Not fatiguing for most viewers.` });
     } else if (m.lra <= 14) {
       recs.push({ type: 'good', title: 'Good dynamic range', body: `${fmt(m.lra, 1)} LU range sounds natural and uncompressed. Viewers won't need to constantly adjust volume.` });
     } else {
-      recs.push({ type: 'warn', title: 'Very dynamic audio', body: `${fmt(m.lra, 1)} LU range means big swings between quiet and loud moments. Viewers may need to adjust volume frequently.` });
+      recs.push({ issue: 'dyn-wide', type: 'warn', title: 'Very dynamic audio', body: `${fmt(m.lra, 1)} LU range means big swings between quiet and loud moments. Viewers may need to adjust volume frequently.` });
     }
   }
 
@@ -754,9 +755,9 @@ function buildRecs(m) {
     const diff = lowEnd - highEnd;
 
     if (diff > 12) {
-      recs.push({ type: 'warn', title: 'Bottom-heavy mix', body: `Sub and bass are ${fmt(diff, 0)} dB louder than the high end. Audio may sound muddy or lacking clarity for viewers.` });
+      recs.push({ issue: 'muddy', type: 'warn', title: 'Bottom-heavy mix', body: `Sub and bass are ${fmt(diff, 0)} dB louder than the high end. Audio may sound muddy or lacking clarity for viewers.` });
     } else if (diff < -12) {
-      recs.push({ type: 'warn', title: 'Bright / harsh mix', body: `High frequencies are ${fmt(-diff, 0)} dB louder than bass. Can cause ear fatigue over extended watching.` });
+      recs.push({ issue: 'harsh', type: 'warn', title: 'Bright / harsh mix', body: `High frequencies are ${fmt(-diff, 0)} dB louder than bass. Can cause ear fatigue over extended watching.` });
     } else {
       recs.push({ type: 'good', title: 'Balanced frequency range', body: 'Low and high frequency energy are well-balanced — no obvious tonal issues detected.' });
     }
@@ -769,23 +770,23 @@ function buildRecs(m) {
 
     // Presence / sibilance
     if (presence > mid + 6) {
-      recs.push({ type: 'warn', title: 'High presence energy', body: `Strong 3–8 kHz energy (+${fmt(presence - mid, 0)} dB above mids). Check for sibilance (harsh "s" sounds) in voice, especially with condenser mics.` });
+      recs.push({ issue: 'harsh', type: 'warn', title: 'High presence energy', body: `Strong 3–8 kHz energy (+${fmt(presence - mid, 0)} dB above mids). Check for sibilance (harsh "s" sounds) in voice, especially with condenser mics.` });
     }
   }
 
   // Noise floor (only flag if we have enough confident samples)
   if (isFinite(m.noiseFloor) && m.noiseFloorSamples?.length >= 30) {
     if (m.noiseFloor > -45) {
-      recs.push({ type: 'bad', title: 'Audible noise floor', body: `Noise floor at ${fmt(m.noiseFloor, 1)} dBFS is clearly audible. Viewers hear persistent hiss or hum. A noise gate or noise suppressor is needed.` });
+      recs.push({ issue: 'noise', type: 'bad', title: 'Audible noise floor', body: `Noise floor at ${fmt(m.noiseFloor, 1)} dBFS is clearly audible. Viewers hear persistent hiss or hum. A noise gate or noise suppressor is needed.` });
     } else if (m.noiseFloor > -50) {
-      recs.push({ type: 'warn', title: 'Elevated noise floor', body: `Noise floor at ${fmt(m.noiseFloor, 1)} dBFS may be noticeable in quiet passages. A noise gate set around −45 dBFS threshold would help.` });
+      recs.push({ issue: 'noise', type: 'warn', title: 'Elevated noise floor', body: `Noise floor at ${fmt(m.noiseFloor, 1)} dBFS may be noticeable in quiet passages. A noise gate set around −45 dBFS threshold would help.` });
     }
     // -50 to -60: acceptable, no mention. Below -60: clean.
   }
 
   // Crest factor (compression indicator)
   if (m.crestFactor < 6) {
-    recs.push({ type: 'warn', title: 'Low crest factor', body: `Crest factor of ${fmt(m.crestFactor, 1)} dB suggests heavy limiting or compression. Transients are likely squashed.` });
+    recs.push({ issue: 'dyn-narrow', type: 'warn', title: 'Low crest factor', body: `Crest factor of ${fmt(m.crestFactor, 1)} dB suggests heavy limiting or compression. Transients are likely squashed.` });
   }
 
   return recs;
@@ -826,6 +827,7 @@ function stopAnalysis(options = {}) {
       contentType: document.getElementById('target-preset').selectedOptions[0]?.text.split('(')[0].trim() || 'Streaming',
       transcriptSegments: transcriptSegments.map(seg => ({ ...seg })),
       transcriptStatus: transcriptExportStatus,
+      hardware: window.HardwareAdvice ? window.HardwareAdvice.snapshot() : null,
     };
   }
 
@@ -1027,6 +1029,7 @@ function updateCorrections(m) {
   const lufsDiff = m.lufsIntegrated - TARGET_LUFS;
   if (lufsDiff > 0.5) {
     corrs.push({
+      issue: 'loud',
       priority: lufsDiff > 4 ? 'bad' : 'warn',
       icon: '↓',
       action: `Lower your output level by ${fmt(lufsDiff, 1)} dB`,
@@ -1035,6 +1038,7 @@ function updateCorrections(m) {
     });
   } else if (lufsDiff < -4) {
     corrs.push({
+      issue: 'quiet',
       priority: 'warn',
       icon: '↑',
       action: `Raise your output level by ${fmt(-lufsDiff, 1)} dB`,
@@ -1055,6 +1059,7 @@ function updateCorrections(m) {
   if (m.clipCount > 0) {
     const excess = Math.max(0, m.peakHoldDB);
     corrs.push({
+      issue: 'clip',
       priority: 'bad',
       icon: '!',
       action: `Add a limiter at −1 dBFS${excess > 0 ? ` (or reduce gain by ${fmt(excess + 1, 1)} dB)` : ''}`,
@@ -1064,6 +1069,7 @@ function updateCorrections(m) {
   } else if (isFinite(m.peakHoldDB) && m.peakHoldDB > -3) {
     const headroom = -1 - m.peakHoldDB;
     corrs.push({
+      issue: 'peak',
       priority: 'warn',
       icon: '⚠',
       action: `Reduce gain by ${fmt(-headroom, 1)} dB or enable a −1 dBFS limiter`,
@@ -1075,6 +1081,7 @@ function updateCorrections(m) {
   // Compression / dynamics
   if (m.lra > 18) {
     corrs.push({
+      issue: 'dyn-wide',
       priority: 'warn',
       icon: '↕',
       action: 'Add gentle compression — ratio 3:1, slow attack, moderate release',
@@ -1083,6 +1090,7 @@ function updateCorrections(m) {
     });
   } else if (m.lra < 3 && m.crestFactor < 4) {
     corrs.push({
+      issue: 'dyn-narrow',
       priority: 'warn',
       icon: '↕',
       action: 'Reduce compression — raise threshold or lower ratio',
@@ -1094,6 +1102,7 @@ function updateCorrections(m) {
   // Noise floor — only flag when we have 30+ sustained quiet samples (-55 dBFS threshold)
   if (isFinite(m.noiseFloor) && m.noiseFloorSamples?.length >= 30 && m.noiseFloor > -50) {
     corrs.push({
+      issue: 'noise',
       priority: m.noiseFloor > -45 ? 'bad' : 'warn',
       icon: '~',
       action: 'Enable a noise gate (close threshold: −45 dBFS, open: −40 dBFS)',
@@ -1109,6 +1118,7 @@ function updateCorrections(m) {
     const diff = lowEnd - highEnd;
     if (diff > 10) {
       corrs.push({
+        issue: 'muddy',
         priority: 'warn',
         icon: '♫',
         action: 'Apply high-pass filter at 80 Hz and cut 200–300 Hz by 3 dB',
@@ -1117,6 +1127,7 @@ function updateCorrections(m) {
       });
     } else if (diff < -10) {
       corrs.push({
+        issue: 'harsh',
         priority: 'warn',
         icon: '♫',
         action: 'Cut 5–8 kHz by 3–4 dB (or use a de-esser)',
@@ -1126,15 +1137,17 @@ function updateCorrections(m) {
     }
   }
 
+  const out = window.HardwareAdvice ? window.HardwareAdvice.applyHardware(corrs) : corrs;
+
   const el = document.getElementById('corrections-list');
   if (!el) return;
 
-  if (!corrs.length) {
+  if (!out.length) {
     el.innerHTML = '<div class="corr-placeholder">Audio looks good — no corrections needed.</div>';
     return;
   }
 
-  el.innerHTML = corrs.map(c => `
+  el.innerHTML = out.map(c => `
     <div class="corr-item corr-${c.priority}">
       <div class="corr-icon">${c.icon}</div>
       <div class="corr-body">
@@ -1164,6 +1177,7 @@ function showReport(snap) {
     contentType = 'Streaming',
     transcriptSegments: reportTranscriptSegments = [],
     transcriptStatus = 'Transcript idle',
+    hardware: snapHardware = null,
   } = snap;
   const snapTarget = targetLufs;
   const duration = hist.length > 1 ? (hist[hist.length - 1].t - hist[0].t) / 1000 : 0;
@@ -1227,9 +1241,18 @@ function showReport(snap) {
       <td>${s.flag || '—'}</td>
     </tr>`).join('');
 
-  // Recommendation items
-  const recHTML = recs.length
-    ? recs.map(r => `<div class="rep-rec ${r.type}"><strong>${r.title}</strong><br>${r.body}</div>`).join('')
+  // Recommendation items — apply the report's saved hardware selection, if any
+  const HW = window.HardwareAdvice;
+  const hwActive = HW && snapHardware && HW.isActive(snapHardware);
+  const reportRecs = (HW && snapHardware)
+    ? recs.filter(r => !r.issue || !HW.hardwareSuppresses(r.issue, snapHardware))
+    : recs;
+  const recHTML = reportRecs.length
+    ? reportRecs.map(r => {
+        const tip = hwActive && r.issue ? HW.hardwareTip(r.issue, snapHardware) : null;
+        const tipHTML = tip ? `<br><span class="rep-rec-gear">→ ${tip}</span>` : '';
+        return `<div class="rep-rec ${r.type}"><strong>${r.title}</strong><br>${r.body}${tipHTML}</div>`;
+      }).join('')
     : '<div class="rep-rec info">Not enough data collected for recommendations.</div>';
   const transcriptHTML = buildTranscriptReportHTML(reportTranscriptSegments, transcriptStatus);
 
@@ -1254,6 +1277,7 @@ function showReport(snap) {
             <span>${date}</span>
             <span>Duration: ${fmtTime(duration)}</span>
             <span>Target: ${snapTarget} LUFS (${contentType})</span>
+            ${hwActive ? `<span>Setup: ${HW.label(snapHardware)}</span>` : ''}
           </div>
         </div>
         ${avgLufs !== null ? (() => {

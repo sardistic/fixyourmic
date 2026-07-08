@@ -209,6 +209,12 @@ main { max-width: 1200px; margin: 0 auto; padding: 18px 20px 60px; }
 .ct-chip:hover { border-color: var(--accent); color: var(--text); }
 .ct-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
+.hw-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.hw-label { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; }
+.hw-optional { opacity: 0.6; }
+.hw-field { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: var(--text-muted); }
+.hw-field select { font-size: 0.78rem; }
+
 .suggestions-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .sug-label { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; }
 .sug-chips { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -1350,6 +1356,7 @@ td.seg-info { color: var(--cyan); font-weight: 600; }
 .rep-rec.warn strong { color: var(--yellow); }
 .rep-rec.bad  strong { color: var(--red); }
 .rep-rec.info strong { color: var(--cyan); }
+.rep-rec-gear { display: inline-block; margin-top: 4px; color: var(--cyan); font-size: 0.78rem; }
 
 .rep-transcript-meta {
   display: flex;
