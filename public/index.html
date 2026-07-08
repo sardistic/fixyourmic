@@ -66,8 +66,8 @@
 
           <div class="hw-row">
             <span class="hw-label">My setup <span class="hw-optional">(optional)</span>:</span>
-            <label class="hw-field">Mic <select id="hw-mic" class="target-select"></select></label>
-            <label class="hw-field">Chain <select id="hw-chain" class="target-select"></select></label>
+            <label class="hw-field">Mic <select class="target-select hw-mic-select"></select></label>
+            <label class="hw-field">Chain <select class="target-select hw-chain-select"></select></label>
           </div>
 
           <div class="suggestions-row">
@@ -469,8 +469,15 @@
       <!-- Broadcast corrections -->
       <div class="card corrections-card">
         <div class="corrections-header">
-          <h2>Corrections Needed</h2>
-          <span class="corrections-sub">Exact adjustments for the selected content target</span>
+          <div>
+            <h2>Corrections Needed</h2>
+            <span class="corrections-sub">Exact adjustments for the selected content target</span>
+          </div>
+          <div class="hw-row hw-row-inline">
+            <span class="hw-label">Setup:</span>
+            <label class="hw-field">Mic <select class="target-select hw-mic-select"></select></label>
+            <label class="hw-field">Chain <select class="target-select hw-chain-select"></select></label>
+          </div>
         </div>
         <div id="corrections-list" class="corrections-list">
           <div class="corr-placeholder">Collecting data — corrections appear after a few seconds of analysis.</div>

@@ -1178,8 +1178,9 @@ input[type="text"].full-width:focus { border-color: var(--accent); }
 
 /* Corrections card */
 .corrections-card { }
-.corrections-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 16px; }
+.corrections-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; justify-content: space-between; }
 .corrections-sub { font-size: 0.75rem; color: var(--text-muted); }
+.hw-row-inline { margin-bottom: 0; align-self: center; }
 .corrections-list { display: flex; flex-direction: column; gap: 10px; }
 .corr-placeholder { font-size: 0.83rem; color: var(--text-muted); padding: 8px 0; }
 

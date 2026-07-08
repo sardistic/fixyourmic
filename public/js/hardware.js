@@ -123,19 +123,30 @@ const CHAINS = {
 // ── Current selection (defaults to fully generic) ─────────────────────────────
 const hardware = { mic: 'generic', chain: 'obs' };
 
-function initHardwareSelectors() {
-  const micSel   = document.getElementById('hw-mic');
-  const chainSel = document.getElementById('hw-chain');
-  if (micSel) {
-    micSel.innerHTML = Object.entries(MICS)
-      .map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
-    micSel.addEventListener('change', e => { hardware.mic = e.target.value; });
-  }
-  if (chainSel) {
-    chainSel.innerHTML = Object.entries(CHAINS)
-      .map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
-    chainSel.addEventListener('change', e => { hardware.chain = e.target.value; });
-  }
+// Populates every mic/chain <select> on the page (there can be more than one —
+// e.g. the start screen and the live dashboard). All stay in sync, and any
+// change fires `onChange` so callers can re-render advice live.
+function initHardwareSelectors(onChange) {
+  const optsFor = (cat) => Object.entries(cat)
+    .map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
+
+  const micSels   = Array.from(document.querySelectorAll('.hw-mic-select'));
+  const chainSels = Array.from(document.querySelectorAll('.hw-chain-select'));
+
+  const wire = (sels, cat, key) => {
+    sels.forEach(sel => {
+      sel.innerHTML = optsFor(cat);
+      sel.value = hardware[key];
+      sel.addEventListener('change', e => {
+        hardware[key] = e.target.value;
+        sels.forEach(s => { if (s !== e.target) s.value = e.target.value; }); // keep duplicates in sync
+        if (typeof onChange === 'function') onChange();
+      });
+    });
+  };
+
+  wire(micSels, MICS, 'mic');
+  wire(chainSels, CHAINS, 'chain');
 }
 
 // ── Resolvers used by the corrections engine ──────────────────────────────────

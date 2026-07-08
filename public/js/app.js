@@ -59,7 +59,12 @@ function formatViewers(n) {
   return `${n}`;
 }
 loadTopStreams();
-if (window.HardwareAdvice) window.HardwareAdvice.initHardwareSelectors();
+if (window.HardwareAdvice) {
+  // Re-render corrections immediately when the streamer changes their gear.
+  window.HardwareAdvice.initHardwareSelectors(() => {
+    if (lastMetrics) updateCorrections(lastMetrics);
+  });
+}
 
 // Robust Twitch channel name extractor — handles any URL format the user might paste
 function parseChannelInput(raw) {
