@@ -716,9 +716,9 @@ function buildRecs(m) {
   if (isFinite(m.lufsIntegrated)) {
     const lufs = m.lufsIntegrated;
     if (lufs > -9) {
-      recs.push({ issue: 'loud', type: 'bad', title: 'Audio is too loud', body: `At ${fmt(lufs, 1)} LUFS, platforms will aggressively reduce your stream. Target around −14 LUFS.` });
+      recs.push({ issue: 'loud', type: 'bad', title: 'Audio is too loud', body: `At ${fmt(lufs, 1)} LUFS, platforms will aggressively turn down the stream. Target around −14 LUFS.` });
     } else if (lufs > TARGET_LUFS) {
-      recs.push({ issue: 'loud', type: 'warn', title: 'Slightly above target', body: `${fmt(lufs, 1)} LUFS is ${fmt(lufs - TARGET_LUFS, 1)} LU above your content-type target. Reduce output by ~${fmt(lufs - TARGET_LUFS, 1)} LU.` });
+      recs.push({ issue: 'loud', type: 'warn', title: 'Slightly above target', body: `${fmt(lufs, 1)} LUFS is ${fmt(lufs - TARGET_LUFS, 1)} LU above the content-type target. Reduce output by ~${fmt(lufs - TARGET_LUFS, 1)} LU.` });
     } else if (lufs >= -18) {
       recs.push({ type: 'good', title: 'Loudness on target', body: `${fmt(lufs, 1)} LUFS sits well within the −14 LUFS streaming sweet spot.` });
     } else if (lufs >= -23) {
@@ -730,9 +730,9 @@ function buildRecs(m) {
 
   // Clipping
   if (m.clipCount > 10) {
-    recs.push({ issue: 'clip', type: 'bad', title: 'Clipping detected', body: `${m.clipCount} clipping events recorded. Viewers hear this as harsh digital distortion. Reduce your output gain or add a limiter.` });
+    recs.push({ issue: 'clip', type: 'bad', title: 'Clipping detected', body: `${m.clipCount} clipping events recorded. Viewers hear this as harsh digital distortion. Reduce the broadcaster's output gain or add a limiter.` });
   } else if (m.clipCount > 0) {
-    recs.push({ issue: 'clip', type: 'warn', title: 'Minor clipping', body: `${m.clipCount} brief clip${m.clipCount > 1 ? 's' : ''} detected. Watch your peak levels — keep peak dBFS below −1 dBFS.` });
+    recs.push({ issue: 'clip', type: 'warn', title: 'Minor clipping', body: `${m.clipCount} brief clip${m.clipCount > 1 ? 's' : ''} detected. Keep the line's peak level below −1 dBFS.` });
   } else if (isFinite(m.peakHoldDB) && m.peakHoldDB > -1) {
     recs.push({ issue: 'peak', type: 'warn', title: 'Peaks near 0 dBFS', body: `Peak at ${fmt(m.peakHoldDB, 1)} dBFS is very close to clipping. Any sudden loud moment will distort.` });
   } else if (isFinite(m.peakHoldDB) && m.peakHoldDB <= -1) {
@@ -1037,25 +1037,25 @@ function updateCorrections(m) {
       issue: 'loud',
       priority: lufsDiff > 4 ? 'bad' : 'warn',
       icon: '↓',
-      action: `Lower your output level by ${fmt(lufsDiff, 1)} dB`,
-      why: `Your stream is ${fmt(lufsDiff, 1)} LU too loud. Viewers hear you louder than other content and Twitch's compressor will kick in.`,
-      how: 'In OBS: Audio Mixer → right-click your source → Filters → Gain. Or lower your interface output knob.',
+      action: `Lower the broadcaster's output level by ${fmt(lufsDiff, 1)} dB`,
+      why: `The stream is ${fmt(lufsDiff, 1)} LU too loud. It sounds louder than other content, and Twitch's compressor will kick in.`,
+      how: 'In OBS: Audio Mixer → right-click the source → Filters → Gain. Or lower the audio interface output knob.',
     });
   } else if (lufsDiff < -4) {
     corrs.push({
       issue: 'quiet',
       priority: 'warn',
       icon: '↑',
-      action: `Raise your output level by ${fmt(-lufsDiff, 1)} dB`,
-      why: `Your stream is ${fmt(-lufsDiff, 1)} LU below target. Viewers need to turn up volume, then get startled by louder streams.`,
-      how: 'In OBS: Filters → Gain. Or increase your mic/interface level.',
+      action: `Raise the broadcaster's output level by ${fmt(-lufsDiff, 1)} dB`,
+      why: `The stream is ${fmt(-lufsDiff, 1)} LU below target. Viewers need to turn up the volume, then get startled by louder streams.`,
+      how: 'In OBS: Filters → Gain. Or increase the mic/interface level.',
     });
   } else {
     corrs.push({
       priority: 'good',
       icon: '✓',
       action: `Loudness is on target (${TARGET_LUFS} LUFS)`,
-      why: `At ${fmt(m.lufsIntegrated, 1)} LUFS, you're within ${fmt(Math.abs(lufsDiff), 1)} LU of the ${TARGET_LUFS} LUFS target — consistent with well-produced streaming content.`,
+      why: `At ${fmt(m.lufsIntegrated, 1)} LUFS, the stream is within ${fmt(Math.abs(lufsDiff), 1)} LU of the ${TARGET_LUFS} LUFS target — consistent with well-produced streaming content.`,
       how: null,
     });
   }
@@ -1069,7 +1069,7 @@ function updateCorrections(m) {
       icon: '!',
       action: `Add a limiter at −1 dBFS${excess > 0 ? ` (or reduce gain by ${fmt(excess + 1, 1)} dB)` : ''}`,
       why: `${m.clipCount} digital clips detected. Viewers hear this as harsh crackling distortion — one of the most jarring listener experiences.`,
-      how: 'In OBS: Filters → Limiter, threshold −1 dB. Or use a hardware limiter on your interface.',
+      how: 'In OBS: Filters → Limiter, threshold −1 dB. Or use a hardware limiter on the audio interface.',
     });
   } else if (isFinite(m.peakHoldDB) && m.peakHoldDB > -3) {
     const headroom = -1 - m.peakHoldDB;
@@ -1079,7 +1079,7 @@ function updateCorrections(m) {
       icon: '⚠',
       action: `Reduce gain by ${fmt(-headroom, 1)} dB or enable a −1 dBFS limiter`,
       why: `Peaks at ${fmt(m.peakHoldDB, 1)} dBFS leave only ${fmt(-headroom, 1)} dB before clipping. Any sudden loud sound will distort.`,
-      how: 'OBS Filters → Limiter, or lower your output fader slightly.',
+      how: 'OBS Filters → Limiter, or lower the broadcaster\'s output fader slightly.',
     });
   }
 
@@ -1090,7 +1090,7 @@ function updateCorrections(m) {
       priority: 'warn',
       icon: '↕',
       action: 'Add gentle compression — ratio 3:1, slow attack, moderate release',
-      why: `Your audio swings ${fmt(m.lra, 1)} LU between quiet and loud. Viewers constantly adjust volume or miss quiet speech.`,
+      why: `The audio swings ${fmt(m.lra, 1)} LU between quiet and loud. Viewers constantly adjust volume or miss quiet speech.`,
       how: 'OBS: Filters → Compressor. Threshold: −18 dB, Ratio: 3:1, Attack: 6 ms, Release: 60 ms.',
     });
   } else if (m.lra < 3 && m.crestFactor < 4) {

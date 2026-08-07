@@ -3,3 +3,5 @@ node_modules/
 *.log
 srv.log
 srv.err
+.agent/runtime/
+docs/agent/HANDOFF.md
