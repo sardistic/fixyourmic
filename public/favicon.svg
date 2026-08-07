@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- Fix Your Mic — mic capsule as a level meter (green→red) -->
+  <!-- Fix the Mic — mic capsule as a level meter (green→red) -->
   <rect width="512" height="512" rx="116" fill="#13131c"/>
   <defs>
     <clipPath id="cap"><rect x="196" y="96" width="120" height="216" rx="60"/></clipPath>

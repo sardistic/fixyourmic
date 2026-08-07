@@ -1,6 +1,6 @@
 {
-  "name": "Fix Your Mic",
-  "short_name": "FixYourMic",
+  "name": "Fix the Mic",
+  "short_name": "FixTheMic",
   "description": "Broadcast-grade audio analysis for streamers",
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },

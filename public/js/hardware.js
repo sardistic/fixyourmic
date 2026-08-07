@@ -1,8 +1,8 @@
 /* Optional hardware-aware advice.
  *
  * Does NOT change what we detect. It re-targets the `how` line of each
- * correction to the streamer's actual gear, and suppresses advice that
- * doesn't apply to their mic (e.g. condenser sibilance tips on a dynamic).
+ * correction to the broadcaster's actual gear, and suppresses advice that
+ * doesn't apply to the selected mic (e.g. condenser sibilance tips on a dynamic).
  *
  * Correction `issue` keys used below:
  *   loud | quiet | clip | peak | dyn-wide | dyn-narrow | noise | muddy | harsh
@@ -19,7 +19,7 @@ const MICS = {
   condenser: { label: 'Generic condenser',   type: 'condenser' },
   sm7b:      { label: 'Shure SM7B',          type: 'dynamic',   hot: true,  tips: {
     muddy: 'The SM7B has a bass-rolloff switch on the back — flip it on to tame proximity boom.',
-    quiet: 'The SM7B is a quiet mic. If your preamp gain is near max, add a Cloudlifter/FetHead (+25 dB clean).',
+    quiet: 'The SM7B is a quiet mic. If the preamp gain is near max, add a Cloudlifter/FetHead (+25 dB clean).',
   }},
   podmic:    { label: 'Rode PodMic',         type: 'dynamic',   hot: true,  tips: {
     muddy: 'PodMic proximity effect is strong — back off 2–3 inches before EQ-ing out the boom.',
@@ -60,7 +60,7 @@ const CHAINS = {
       clip:         'GoXLR: back off Mic → Gain first; the input is clipping before OBS ever sees it.',
       peak:         'GoXLR: nudge the Mic fader down a touch, or lower Mic → Gain.',
       'dyn-wide':   'GoXLR: Compressor tab → Ratio ~3:1, Threshold around −18 dB.',
-      'dyn-narrow': 'GoXLR: Compressor tab → raise Threshold / lower Ratio; you\'re over-compressing.',
+      'dyn-narrow': 'GoXLR: Compressor tab → raise Threshold / lower Ratio; the line is over-compressed.',
       noise:      'GoXLR: Gate tab → Threshold ~−40 dB, Attenuation 100%, Release ~200 ms.',
       muddy:      'GoXLR: Equaliser tab → high-pass ~80 Hz and cut the 200–300 Hz band a few dB.',
       harsh:      'GoXLR: Equaliser tab → pull down the 6–8 kHz band a few dB.',
